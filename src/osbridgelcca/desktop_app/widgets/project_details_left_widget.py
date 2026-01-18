@@ -1,3 +1,6 @@
+
+
+
 from PySide6.QtWidgets import QApplication, QMainWindow
 from PySide6.QtCore import QCoreApplication, Qt, QSize, QPropertyAnimation, QEasingCurve, Signal
 from PySide6.QtWidgets import (QHBoxLayout, QPushButton, QTextEdit, QWidget, QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy)
@@ -232,7 +235,12 @@ class ProjectDetailsLeft(QWidget):
             KEY_DEMOLITION_RECYCLE: []
         }
         for label, sublabels in button_data.items():
-            btn = QPushButton(label)
+            # CHANGE: Check for Structure Works Data and rename it
+            display_label = label
+            if label == KEY_STRUCTURE_WORKS_DATA:
+                display_label = "Construction work data"
+
+            btn = QPushButton(display_label)
             btn.setProperty("class", "category_button")
             btn.setProperty("selected", False)
             btn.setProperty("expanded", False)
@@ -241,7 +249,8 @@ class ProjectDetailsLeft(QWidget):
             btn.setFocusPolicy(Qt.StrongFocus)
             btn.setIcon(unselected_unexpanded_icon)
             btn.setIconSize(QSize(10, 10))
-            btn.clicked.connect(lambda checked ,b=btn ,name=label: self.show_structure_widget(name, b))
+            # Use display_label for logic so main window receives "Construction work data"
+            btn.clicked.connect(lambda checked ,b=btn ,name=display_label: self.show_structure_widget(name, b))
             scroll_content_layout.addWidget(btn)
             self.all_param_buttons[label] = btn
             if sublabels:
