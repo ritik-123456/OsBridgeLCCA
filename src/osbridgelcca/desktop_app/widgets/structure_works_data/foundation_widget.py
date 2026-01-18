@@ -19,59 +19,981 @@ class MaterialInputPopup(QDialog):
         # --- 1. MASTER DATABASE (Categorized by Component) ---
         # This structure allows showing different options based on the component selected.
         self.master_db = {
-            "Excavation": {
-                "All type(manual) (0 to 1.5m)": {
-                    "unit": "cum", "rate": "239", "source": "Maha PWD SOR",
-                    "carbon": "NA", "carbon_unit": "NA", "conv": "1", 
-                    "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+            
+                "Excavation": {
+                    "All type(manual) (0 to 1.5m)": {
+                        "unit": "cum", "rate": "239", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1", 
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(manual) (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "262.9", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(manual) (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "286.8", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(manual) (4.5 to 6)": {
+                        "unit": "cum", "rate": "310.7", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(manual) (Above 6 m)": {
+                        "unit": "cum", "rate": "310.7", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(Mechanical) (0 to 1.5m)": {
+                        "unit": "cum", "rate": "90", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(Mechanical) (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "99", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(Mechanical) (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "108", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(Mechanical) (4.5 to 6)": {
+                        "unit": "cum", "rate": "117", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "All type(Mechanical) (Above 6 m)": {
+                        "unit": "cum", "rate": "117", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum (0 to 1.5m)": {
+                        "unit": "cum", "rate": "241", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "265.1", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "289.2", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum (4.5 to 6)": {
+                        "unit": "cum", "rate": "313.3", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum (Above 6 m)": {
+                        "unit": "cum", "rate": "313.3", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum and Boulders (0 to 1.5m)": {
+                        "unit": "cum", "rate": "286", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum and Boulders (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "314.6", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum and Boulders (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "343.2", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum and Boulders (4.5 to 6)": {
+                        "unit": "cum", "rate": "371.8", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Murrum and Boulders (Above 6 m)": {
+                        "unit": "cum", "rate": "371.8", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Soft Rock (0 to 1.5m)": {
+                        "unit": "cum", "rate": "557", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Soft Rock (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "612.7", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Soft Rock (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "668.4", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Soft Rock (4.5 to 6)": {
+                        "unit": "cum", "rate": "724.1", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Soft Rock (Above 6 m)": {
+                        "unit": "cum", "rate": "724.1", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Blasting) (0 to 1.5m)": {
+                        "unit": "cum", "rate": "1232", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Blasting) (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "1355.2", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Blasting) (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "1478.4", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Blasting) (4.5 to 6)": {
+                        "unit": "cum", "rate": "1601.6", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Blasting) (Above 6 m)": {
+                        "unit": "cum", "rate": "1601.6", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Controlled Blasting) (0 to 1.5m)": {
+                        "unit": "cum", "rate": "1328", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Controlled Blasting) (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "1460.8", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Controlled Blasting) (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "1593.6", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Controlled Blasting) (4.5 to 6)": {
+                        "unit": "cum", "rate": "1726.4", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard Rock (Controlled Blasting) (Above 6 m)": {
+                        "unit": "cum", "rate": "1726.4", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard rock (Chiselling and Wedging or Line drilling) (0 to 1.5m)": {
+                        "unit": "cum", "rate": "1932", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard rock (Chiselling and Wedging or Line drilling) (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "2125.2", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard rock (Chiselling and Wedging or Line drilling) (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "2318.4", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard rock (Chiselling and Wedging or Line drilling) (4.5 to 6)": {
+                        "unit": "cum", "rate": "2511.6", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Hard rock (Chiselling and Wedging or Line drilling) (Above 6 m)": {
+                        "unit": "cum", "rate": "2511.6", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Laterite Rock (0 to 1.5m)": {
+                        "unit": "cum", "rate": "1771", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Laterite Rock (1.5 to 3.0m)": {
+                        "unit": "cum", "rate": "1948.1", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Laterite Rock (3.0 to 4.5m)": {
+                        "unit": "cum", "rate": "2125.2", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Laterite Rock (4.5 to 6)": {
+                        "unit": "cum", "rate": "2302.3", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    },
+                    "Laterite Rock (Above 6 m)": {
+                        "unit": "cum", "rate": "2302.3", "source": "Maha PWD SOR",
+                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
+                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
+                    }
                 },
-                "All type(manual) (1.5 to 3.0m)": {
-                    "unit": "cum", "rate": "262.9", "source": "Maha PWD SOR",
-                    "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                    "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                },
-                "All type(manual) (3.0 to 4.5m)": {
-                    "unit": "cum", "rate": "286.8", "source": "Maha PWD SOR",
-                    "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                    "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                },
-                "All type(manual) (4.5 to 6)": {
-                    "unit": "cum", "rate": "310.7", "source": "Maha PWD SOR",
-                    "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                    "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                },
-                "All type(manual) (Above 6 m)": {
-                    "unit": "cum", "rate": "310.7", "source": "Maha PWD SOR",
-                    "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                    "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                }
-            },
+                        
             
             "Pile": {
-                "Concrete of Bored pile (M40) (1500mm) (0 to 5m)": {
+                "Steel Rebar (Fe500)": {
+                    "unit": "MT", "rate": "88341", "source": "Maha PWD SOR",
+                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "1000",
+                    "c_source": "IFC", "recyclable": True, "grades": ["Fe500"]
+                },
+                "Concreting of bored pile (M30) (450mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "2914", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (450mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "3788.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (450mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4079.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (450mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "4662.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (450mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "5828", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (475mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3060", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (475mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "3978", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (475mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4284", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (475mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "4896", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (475mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6120", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (500mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3182", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (500mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4136.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (500mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4454.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (500mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5091.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (500mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6364", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (525mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3309", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (525mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4301.7", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (525mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4632.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (525mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5294.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (525mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6618", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (550mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3443", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (550mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4475.9", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (550mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4820.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (550mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5508.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (550mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6886", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (600mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "5027", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (600mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "6535.1", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (600mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "7037.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (600mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "8043.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (600mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "10054", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (625mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "5180", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (625mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "6734", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (625mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "7252", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (625mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "8288", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (625mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "10360", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (650mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "5340", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (650mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "6942", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (650mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "7476", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (650mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "8544", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (650mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "10680", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (750mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "7779", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (750mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "10112.7", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (750mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "10890.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (750mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "12446.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (750mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "15558", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (800mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "8197", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (800mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "10656.1", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (800mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "11475.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (800mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "13115.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (800mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "16394", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (825mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "8535", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (825mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "11095.5", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (825mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "11949", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (825mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "13656", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (825mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "17070", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (900mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "9277", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (900mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "12060.1", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (900mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "12987.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (900mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "14843.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (900mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "18554", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (975mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "10070", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (975mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "13091", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (975mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "14098", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (975mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "16112", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (975mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "20140", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1000mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "12352", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1000mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "16057.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1000mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "17292.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1000mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "19763.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1000mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "24704", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1050mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "13380", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1050mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "17394", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1050mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "18732", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1050mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "21408", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1050mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "26760", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1100mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "14462", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1100mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "18800.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1100mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "20246.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1100mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "23139.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1100mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "28924", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1200mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "17082", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1200mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "22206.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1200mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "23914.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1200mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "27331.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1200mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "34164", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M30) (1500mm) (0 to 5m)": {
                     "unit": "Rmt", "rate": "26701", "source": "Maha PWD SOR",
                     "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M40"]
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
                 },
-                "Concrete of Bored pile (M40) (1500mm) (5 to 10m)": {
+                "Concreting of bored pile (M30) (1500mm) (5 to 10m)": {
                     "unit": "Rmt", "rate": "34711.3", "source": "Maha PWD SOR",
                     "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M40"]
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
                 },
-                "Concrete of Bored pile (M40) (1500mm) (10 to 15m)": {
+                "Concreting of bored pile (M30) (1500mm) (10 to 15m)": {
                     "unit": "Rmt", "rate": "37381.4", "source": "Maha PWD SOR",
                     "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M40"]
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
                 },
-                "Concrete of Bored pile (M40) (1500mm) (15m to 20m)": {
+                "Concreting of bored pile (M30) (1500mm) (15 to 20m)": {
                     "unit": "Rmt", "rate": "42721.6", "source": "Maha PWD SOR",
                     "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M40"]
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
                 },
-                "Concrete of Bored pile (M40) (1500mm) (Above 20m)": {
+                "Concreting of bored pile (M30) (1500mm) (Above 20m)": {
                     "unit": "Rmt", "rate": "53402", "source": "Maha PWD SOR",
                     "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M40"]
+                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
+                },
+                "Concreting of bored pile (M35) (450mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3021", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (450mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "3927.3", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (450mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4229.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (450mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "4833.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (450mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6042", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (475mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3178", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (475mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4131.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (475mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4449.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (475mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5084.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (475mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6356", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (500mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3311", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (500mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4304.3", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (500mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4635.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (500mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5297.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (500mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6622", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (525mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3452", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (525mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4487.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (525mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "4832.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (525mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5523.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (525mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "6904", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (550mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "3606", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (550mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "4687.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (550mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "5048.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (550mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "5769.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (550mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "7212", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (600mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "5217", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (600mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "6782.1", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (600mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "7303.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (600mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "8347.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (600mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "10434", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (625mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "5387", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (625mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "7003.1", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (625mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "7541.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (625mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "8619.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (625mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "10774", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (650mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "5563", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (650mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "7231.9", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (650mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "7788.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (650mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "8900.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (650mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "11126", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (750mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "8075", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (750mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "10497.5", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (750mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "11305", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (750mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "12920", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (750mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "16150", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (800mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "8536", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (800mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "11096.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (800mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "11950.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (800mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "13657.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (800mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "17072", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (825mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "8806", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (825mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "11447.8", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (825mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "12328.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (825mm) (15 to 20m)": {
+                    "unit": "Rmt", "rate": "14089.6", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (825mm) (Above 20m)": {
+                    "unit": "Rmt", "rate": "17612", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (900mm) (0 to 5m)": {
+                    "unit": "Rmt", "rate": "9598", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (900mm) (5 to 10m)": {
+                    "unit": "Rmt", "rate": "12477.4", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
+                },
+                "Concreting of bored pile (M35) (900mm) (10 to 15m)": {
+                    "unit": "Rmt", "rate": "13437.2", "source": "Maha PWD SOR",
+                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
+                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
                 }
             },
 
