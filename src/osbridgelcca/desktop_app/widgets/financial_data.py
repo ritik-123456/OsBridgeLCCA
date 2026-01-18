@@ -1,3 +1,4 @@
+
 from PySide6.QtWidgets import QApplication, QMainWindow
 from PySide6.QtCore import QCoreApplication, Qt, QSize, Signal
 from PySide6.QtWidgets import (QHBoxLayout, QPushButton, QLineEdit, QComboBox, QGridLayout, QWidget, QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy, QFrame)
@@ -259,8 +260,8 @@ class FinancialData(QWidget):
         grid_layout.addWidget(unit4, 4, 2, alignment=Qt.AlignVCenter)
         grid_layout.addWidget(suggested4, 4, 3, alignment=Qt.AlignVCenter)
 
-        # 6. Time for construction of Base Project
-        label5 = QLabel("Time for construction of Base Project")
+        # 6. Duration of construction
+        label5 = QLabel("Duration of construction")
         label5.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         input5 = QLineEdit()
         self.widgets.append(input5)
@@ -348,30 +349,3 @@ class FinancialData(QWidget):
 
         # calculate Time Cost
         self.database_manager.calculate_time_cost()
-
-#----------------Standalone-Test-Code--------------------------------
-
-# class MyMainWindow(QMainWindow):
-#     def __init__(self):
-#         super().__init__()
-
-#         self.setStyleSheet("border: none")
-
-#         self.central_widget = QWidget()
-#         self.central_widget.setObjectName("central_widget")
-#         self.setCentralWidget(self.central_widget)
-
-#         self.main_h_layout = QHBoxLayout(self.central_widget)
-#         self.main_h_layout.addStretch(1)
-
-#         self.main_h_layout.addWidget(FinancialData(), 2)
-
-#         self.setWindowState(Qt.WindowMaximized)
-
-
-# if __name__ == "__main__":
-#     QCoreApplication.setAttribute(Qt.AA_DontShowIconsInMenus, False)
-#     app = QApplication(sys.argv)
-#     window = MyMainWindow()
-#     window.show()
-#     sys.exit(app.exec())
