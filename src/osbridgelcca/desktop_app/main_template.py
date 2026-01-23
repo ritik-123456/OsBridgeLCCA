@@ -29,8 +29,236 @@ from osbridgelcca.desktop_app.widgets.tab_widget import CustomTabWidget
 from osbridgelcca.desktop_app.widgets.utils.data import *
 from osbridgelcca.desktop_app.widgets.utils.database import DatabaseManager
 from osbridgelcca.desktop_app.resources.resources_rc import *
+from PySide6.QtWidgets import QFileDialog
+import pandas as pd
+import json
+import numpy as np
+
+# ================== CHANGES MADE BY RITIK ==================
+# Excel Parsing & Validation Logic (INLINE)
+
+ALLOWED_UNITS = {'cum', 'rmt', 'm2', 'mt'}
+FLEXIBLE_FIELD_CONFIG = ['carbon_emission', 'conversion_factor']
+ALLOWED_FLEXIBLE_VALUES = {'not_available'}
+ALLOWED_RECYCLE_VALUES = {'recycleable', 'recyclable', 'non-recyclable'}
+
+def clean_header(header_val):
+    if not isinstance(header_val, str):
+        return str(header_val)
+    return header_val.replace('CID#', '').lower().strip()
+
+def is_valid_number(val):
+    if val is None or val == "":
+        return False
+    try:
+        float(val)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+def get_row_identifier(sheet, type_name, row_idx):
+    return f"Sheet: '{sheet}', Component: '{type_name}', Row: {row_idx + 1}"
+
+def parse_and_validate_excel(file_path):
+    try:
+        all_sheets = pd.read_excel(file_path, sheet_name=None, header=None)
+    except Exception as e:
+        return {"fatal_error": f"Failed to read file: {str(e)}"}
+
+    parsed_sections = []
+    global_errors = []
+    global_warnings = []
+
+    for sheet_name, df in all_sheets.items():
+
+        current_section = None
+        current_keys = None
+        section_seen_data = {}
+
+        for idx, row in df.iterrows():
+            if row.isnull().all():
+                continue
+
+            first_val = str(row[0]).strip() if pd.notna(row[0]) else ""
+
+            # 1. Identify Header (CID#)
+            if first_val.startswith('CID#'):
+                current_keys = []
+                for i, val in enumerate(row):
+                    if pd.notna(val) and str(val).strip() != "":
+                        current_keys.append((i, clean_header(str(val).strip())))
+                continue
+
+            # Skip visual headers
+            if first_val == 'Material':
+                continue
+
+            # 2. Identify Section
+            col2 = row[2] if len(row) > 2 else np.nan
+            col3 = row[3] if len(row) > 3 else np.nan
+
+            if pd.notna(row[0]) and pd.isna(col2) and pd.isna(col3):
+                if current_section:
+                    parsed_sections.append(current_section)
+
+                current_section = {
+                    "sheetName": sheet_name,
+                    "type": first_val,
+                    "data": []
+                }
+                section_seen_data = {}
+                continue
+
+            # 3. Process Data Row
+            if current_section and current_keys:
+                raw_row_data = {}
+                for col_idx, key in current_keys:
+                    if col_idx < len(row):
+                        val = row[col_idx]
+                        raw_row_data[key] = None if pd.isna(val) or str(val).strip() == "" else val
+                    else:
+                        raw_row_data[key] = None
+
+                qty_val = raw_row_data.get('quantity')
+                if qty_val is None:
+                    continue
+
+                final_row_data = raw_row_data.copy()
+                row_has_critical_error = False
+                is_duplicate = False
+                row_context = get_row_identifier(sheet_name, current_section['type'], idx)
+
+                # Quantity
+                if not is_valid_number(qty_val):
+                    global_errors.append(f"{row_context} - Error: Quantity '{qty_val}' is not a valid number.")
+                    row_has_critical_error = True
+
+                # Rate
+                rate_val = final_row_data.get('rate')
+                if rate_val is None or not is_valid_number(rate_val):
+                    global_errors.append(f"{row_context} - Error: Invalid or missing rate.")
+                    row_has_critical_error = True
+
+                # Sources (warnings)
+                if final_row_data.get('rate_src') is None:
+                    global_warnings.append(f"{row_context} - Warning: 'rate_src' is missing.")
+                if final_row_data.get('carbon_emission_src') is None:
+                    global_warnings.append(f"{row_context} - Warning: 'carbon_emission_src' is missing.")
+
+                # Flexible fields
+                for field in FLEXIBLE_FIELD_CONFIG:
+                    val = final_row_data.get(field)
+                    if val is not None:
+                        val_str = str(val).strip().lower()
+                        if not is_valid_number(val) and val_str not in ALLOWED_FLEXIBLE_VALUES:
+                            global_errors.append(
+                                f"{row_context} - Error: Field '{field}' value '{val}' is invalid."
+                            )
+                            row_has_critical_error = True
+
+                # Unit
+                unit_val = final_row_data.get('unit')
+                if not unit_val or str(unit_val).strip().lower() not in ALLOWED_UNITS:
+                    global_errors.append(f"{row_context} - Error: Invalid or missing unit.")
+                    row_has_critical_error = True
+
+                # Recyclable
+                recycle_val = final_row_data.get('recycleable')
+                if recycle_val is None or str(recycle_val).strip() == "":
+                    global_warnings.append(
+                        f"{row_context} - Warning: 'recycleable' blank, assumed non-recyclable."
+                    )
+                else:
+                    if str(recycle_val).strip().lower() not in ALLOWED_RECYCLE_VALUES:
+                        global_errors.append(
+                            f"{row_context} - Error: Invalid 'recycleable' value '{recycle_val}'."
+                        )
+                        row_has_critical_error = True
+
+                # Duplicate check
+                name_val = final_row_data.get('name')
+                if name_val:
+                    if name_val in section_seen_data:
+                        original = section_seen_data[name_val]
+                        if final_row_data == original['data']:
+                            global_warnings.append(
+                                f"{row_context} - Warning: Duplicate '{name_val}' merged."
+                            )
+                            is_duplicate = True
+                        else:
+                            global_errors.append(
+                                f"{row_context} - Error: Duplicate '{name_val}' with conflicts."
+                            )
+                            is_duplicate = True
+                    else:
+                        section_seen_data[name_val] = {
+                            "data": final_row_data,
+                            "row_id": row_context
+                        }
+
+                if not row_has_critical_error and not is_duplicate:
+                    current_section['data'].append(final_row_data)
+
+        if current_section:
+            parsed_sections.append(current_section)
+
+    return {
+        "validation_report": {
+            "errors": global_errors,
+            "warnings": global_warnings
+        },
+        "parsed_data": parsed_sections
+    }
+
+   
+
+
 
 class UiMainWindow(object):
+    def open_excel_dialog(self):
+        print("Upload Excel clicked")
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            None,
+            "Select Excel File",
+            "",
+            "Excel Files (*.xlsx *.xls)"
+        )
+
+        if not file_path:
+            print("No file selected")
+            return
+
+        print(f"\nSelected file: {file_path}")
+
+        result = parse_and_validate_excel(file_path)
+
+        if result is None:
+            print("[FATAL] Parser returned None. Check parse_and_validate_excel().")
+            return
+
+        try:
+            result = parse_and_validate_excel(file_path)
+
+            validation = result.get("validation_report", {})
+            errors = validation.get("errors", [])
+            warnings = validation.get("warnings", [])
+
+            print("\n--- ERRORS ---")
+            for e in errors or ["No errors found"]:
+                print(e)
+
+            print("\n--- WARNINGS ---")
+            for w in warnings or ["No warnings found"]:
+                print(w)
+
+            print("\n--- PARSED DATA ---")
+            print(json.dumps(result.get("parsed_data", []), indent=2))
+
+        except Exception as e:
+            print("[FATAL] Excel parsing failed")
+            print(e)
+
     def setupUi(self, MainWindow):
         self.database_manager = DatabaseManager()
         # To check if tab widget is there or no
@@ -351,7 +579,10 @@ class UiMainWindow(object):
 
         # --- ADDED: Upload Excel Button ---
         self.upload_excel_button = QPushButton("Upload Excel")
-        self.upload_excel_button.setObjectName(u"upload_excel_button")
+        self.upload_excel_button.setObjectName("upload_excel_button")
+        #CHANGES MADE BY RITIK: Connect Upload Excel button to file dialog
+        self.upload_excel_button.clicked.connect(self.open_excel_dialog)
+
         self.upload_excel_button.setFixedSize(100, 30) # Wider to fit text
         self.upload_excel_button.setStyleSheet("""
             QPushButton {
