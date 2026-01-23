@@ -1,4 +1,3 @@
-
 """
 Main application window for Osdag GUI.
 Handles tab management, docking icons, and main window controls.
@@ -36,19 +35,24 @@ class HomeWindow(QMainWindow):
         screen_width = screen_size.width()
         screen_height = screen_size.height()
 
+        # --- CHANGED: Commented out custom geometry calculations ---
         # Calculate window size
-        window_width = int(7 * screen_width / 10)
-        window_height = int((7 * screen_height) / 8)
+        # window_width = int(7 * screen_width / 10)
+        # window_height = int((7 * screen_height) / 8)
 
         # Set window size
-        self.resize(window_width, window_height)
+        # self.resize(window_width, window_height)
 
         # Center the window
-        x = int((screen_width - window_width) / 2)
-        y = int((screen_height - window_height) / 2)
+        # x = int((screen_width - window_width) / 2)
+        # y = int((screen_height - window_height) / 2)
 
-        self.setGeometry(x, y, window_width, window_height)
-        self.setWindowFlags(Qt.FramelessWindowHint) # Make the window frameless for custom buttons
+        # self.setGeometry(x, y, window_width, window_height)
+        
+        # --- CHANGED: Added minimum size and removed FramelessWindowHint ---
+        self.setMinimumSize(800, 600) 
+        # self.setWindowFlags(Qt.FramelessWindowHint) # Make the window frameless for custom buttons
+        
         self.current_tab_index = 0 # To keep track of the next tab index
         self.btn_size = QSize(46, 30)
 
@@ -111,29 +115,30 @@ class HomeWindow(QMainWindow):
         # Stretch to push buttons to the right
         top_h_layout.addStretch(1)
 
+        # --- CHANGED: Commented out custom window control buttons ---
         # Helper function to create a styled button
-        def create_button(icon_svg, is_close=False):
-            btn = QPushButton()
-            btn.setFixedSize(self.btn_size)
-            btn.setIcon(QIcon(QPixmap.fromImage(QPixmap(icon_svg).toImage())))
-            btn.setIconSize(QSize(14, 14))
-            if is_close:
-                btn.setObjectName("close_button")
-            else:
-                btn.setObjectName("window_control_button")
-            return btn
+        # def create_button(icon_svg, is_close=False):
+        #     btn = QPushButton()
+        #     btn.setFixedSize(self.btn_size)
+        #     btn.setIcon(QIcon(QPixmap.fromImage(QPixmap(icon_svg).toImage())))
+        #     btn.setIconSize(QSize(14, 14))
+        #     if is_close:
+        #         btn.setObjectName("close_button")
+        #     else:
+        #         btn.setObjectName("window_control_button")
+        #     return btn
 
-        self.minimize_button = create_button(":/vectors/window_minimize_light.svg")
-        self.minimize_button.clicked.connect(self.showMinimized)
-        top_h_layout.addWidget(self.minimize_button)
+        # self.minimize_button = create_button(":/vectors/window_minimize_light.svg")
+        # self.minimize_button.clicked.connect(self.showMinimized)
+        # top_h_layout.addWidget(self.minimize_button)
 
-        self.maximize_button = create_button(":/vectors/window_maximize_light.svg")
-        self.maximize_button.clicked.connect(self.toggle_maximize_restore)
-        top_h_layout.addWidget(self.maximize_button)
+        # self.maximize_button = create_button(":/vectors/window_maximize_light.svg")
+        # self.maximize_button.clicked.connect(self.toggle_maximize_restore)
+        # top_h_layout.addWidget(self.maximize_button)
 
-        self.close_button = create_button(":/vectors/window_close_light.svg", is_close=True)
-        self.close_button.clicked.connect(self.close)
-        top_h_layout.addWidget(self.close_button)
+        # self.close_button = create_button(":/vectors/window_close_light.svg", is_close=True)
+        # self.close_button.clicked.connect(self.close)
+        # top_h_layout.addWidget(self.close_button)
 
         self.start_pos = None
         self.start_geometry = None
@@ -157,27 +162,28 @@ class HomeWindow(QMainWindow):
         if self.tab_bar.count() > 0:
             self.tab_widget.setCurrentIndex(self.tab_bar.currentIndex())
 
-    def paintEvent(self, event):
-        if self.isMaximized():
-            self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_restore_light.svg").toImage())))
-        else:
-            self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_maximize_light.svg").toImage())))
-        super().paintEvent(event)
+    # --- CHANGED: Commented out methods relying on custom buttons to prevent crash ---
+    # def paintEvent(self, event):
+    #     if self.isMaximized():
+    #         self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_restore_light.svg").toImage())))
+    #     else:
+    #         self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_maximize_light.svg").toImage())))
+    #     super().paintEvent(event)
 
-    def set_maximize_icon(self):
-        self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_maximize_light.svg").toImage())))
+    # def set_maximize_icon(self):
+    #     self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_maximize_light.svg").toImage())))
 
-    def set_restore_icon(self):
-        self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_restore_light.svg").toImage())))
+    # def set_restore_icon(self):
+    #     self.maximize_button.setIcon(QIcon(QPixmap.fromImage(QPixmap(":/vectors/window_restore_light.svg").toImage())))
         
     def toggle_maximize_restore(self):
         """Toggles between maximized and normal window states and updates the icon."""
         if self.isMaximized():
             self.showNormal()
-            self.set_maximize_icon()
+            # self.set_maximize_icon() # Commented out
         else:
             self.showMaximized()
-            self.set_restore_icon()
+            # self.set_restore_icon() # Commented out
 
     def add_new_tab(self, module):
         """Helper to add a new tab to QTabWidget."""

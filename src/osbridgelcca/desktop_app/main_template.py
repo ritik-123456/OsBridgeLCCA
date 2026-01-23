@@ -1,5 +1,3 @@
-
-
 """
 <Author>: Prerna Praveen Vidyarthi
 <Intern>: FOSSEE Summer Fellowship 2025
@@ -65,8 +63,10 @@ class UiMainWindow(object):
         else:
             print("Failed to load Alata font")
 
-        MainWindow.setWindowTitle("Custom Title Bar App")
-        MainWindow.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        MainWindow.setWindowTitle("3psLCCA")
+        # --- CHANGED: Commented out FramelessWindowHint ---
+        # MainWindow.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        
         screen = QApplication.primaryScreen().geometry()
         x = (screen.width()*1//8)
         y = (screen.height()*1//8)
@@ -78,7 +78,7 @@ class UiMainWindow(object):
                 border: none;
             }
             QMenuBar {
-                background-color: #FAFAFA;
+                background-color: #E8F5E9;
                 border-bottom: 1px solid #d0d0d0;
                 border-left: 1px solid #285A23;
                 border-right: 1px solid #285A23;
@@ -132,9 +132,11 @@ class UiMainWindow(object):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
+        #     CHANGED: Commented out Custom Title Bar 
+        
         # Add the custom title bar to the top of the main layout
-        self.title_bar = CustomTitleBar(MainWindow)
-        main_layout.addWidget(self.title_bar)
+        # self.title_bar = CustomTitleBar(MainWindow)
+        # main_layout.addWidget(self.title_bar)
 
         # Create and add menu bar directly to the central widget's main_layout
         # DO NOT use MainWindow.setMenuBar() when using FramelessWindowHint
@@ -295,6 +297,7 @@ class UiMainWindow(object):
                 border-radius: 5px;
                 background-color: #EDEDED;
                 border: 1px solid #BBBBBB;
+               
             }
             QPushButton:hover {
                 background-color: #FAFAFA;
@@ -345,6 +348,34 @@ class UiMainWindow(object):
         self.save_button.setMenu(self.save_menu)
 
         button_layout.addWidget(self.save_button)
+
+        # --- ADDED: Upload Excel Button ---
+        self.upload_excel_button = QPushButton("Upload Excel")
+        self.upload_excel_button.setObjectName(u"upload_excel_button")
+        self.upload_excel_button.setFixedSize(100, 30) # Wider to fit text
+        self.upload_excel_button.setStyleSheet("""
+            QPushButton {
+                border-radius: 5px;
+                background-color: #217346; /* Excel Green Background */
+                border: 1px solid #1a5c38;
+                color: white; /* White Text */
+                font-weight: bold;
+                font-size: 10px;
+                padding-left: 5px;
+                padding-right: 5px;
+                margin-left: 20px;
+            }
+            QPushButton:hover {
+                background-color: #2b945a; /* Lighter Green on hover */
+                border: 1px solid #217346;
+            }
+            QPushButton:pressed {
+                background-color: #1a5c38;
+            }
+        """)
+        self.upload_excel_button.setToolTip("Upload Excel")
+        button_layout.addWidget(self.upload_excel_button)
+        # ----------------------------------
 
         # ------------------------------------------------------------
 
