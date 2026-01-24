@@ -3,33 +3,37 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QDialog, QFormLayout, 
                                QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy, QFrame, 
                                QMessageBox, QCompleter, QListWidget, QAbstractItemView, QToolTip)
 from PySide6.QtCore import (QCoreApplication, Qt, QSize, Signal, QStringListModel, QPoint, QEvent, 
-                            QObject, QTimer, QRect) 
+                            QObject, QTimer, QRect, Slot) 
 from PySide6.QtGui import QIcon, QDoubleValidator, QIntValidator, QCursor
 import sys
 
 # --- CONSTANTS FROM PROVIDED DATA ---
-# Extracted unique units from the JSON data provided
 DROPDOWN_UNITS = ["cum", "MT", "Rmt", "RMT", "m2", "number"]
 
 # --- IMPORTS ---
-# Assuming these exist in your project structure
 from osbridgelcca.desktop_app.widgets.utils.data import *
 
 try:
-    from osbridgelcca.desktop_app.widgets.utils.sor_backend import searcher
+    # UPDATED IMPORT: We now import the manager instance to handle dynamic JSON loading
+    from osbridgelcca.desktop_app.widgets.utils.sor_backend import sor_manager
 except ImportError:
     print("Warning: sor_backend.py not found. Search features will be limited.")
-    searcher = None
+    sor_manager = None
 
 # --- NEW: Event Filter for Locking Logic (Fixed Flickering) ---
 class LockEventFilter(QObject):
     def __init__(self, foundation_widget):
-        super().__init__()
+        # Pass parent to avoid Garbage Collection issues
+        super().__init__(foundation_widget)
         self.foundation = foundation_widget
 
     def eventFilter(self, obj, event):
+        # Safety check for foundation existence
+        if not hasattr(self, 'foundation') or self.foundation is None:
+            return super().eventFilter(obj, event)
+
         # Only intercept interaction events if the Foundation is locked
-        if self.foundation.is_locked:
+        if getattr(self.foundation, 'is_locked', False):
             # Check for Mouse Clicks, Key Presses, or Wheel scrolls
             if event.type() in [QEvent.MouseButtonPress, QEvent.MouseButtonDblClick, 
                                 QEvent.KeyPress, QEvent.KeyRelease, QEvent.Wheel]:
@@ -45,12 +49,16 @@ class LockEventFilter(QObject):
 
 # --- UPDATED: MATERIAL INPUT POPUP ---
 class MaterialInputPopup(QDialog):
-    def __init__(self, material_data_source, component_name, parent=None):
+    def __init__(self, material_data_source, component_name, current_region, current_sor, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Material Details")
         self.setFixedWidth(750) 
         self.material_data_source = material_data_source
-        self.component_name = component_name 
+        self.component_name = component_name
+        # Store context
+        self.current_region = current_region
+        self.current_sor = current_sor
+        
         self.result_data = None
         
         self.init_ui()
@@ -75,7 +83,10 @@ class MaterialInputPopup(QDialog):
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(15)
         
-        header_text = QLabel(f"Region: India, Selected SOR: Mumbai SOR 2025\nAdding in Foundation > {self.component_name} Component")
+        # --- DYNAMIC HEADER ---
+        header_text_val = f"Region: {self.current_region}, Selected SOR: {self.current_sor}\nAdding in Foundation > {self.component_name} Component"
+        
+        header_text = QLabel(header_text_val)
         header_text.setStyleSheet("font-weight: bold; color: #2c3e50; font-size: 13px; margin-bottom: 5px;")
         layout.addWidget(header_text)
         
@@ -197,8 +208,11 @@ class MaterialInputPopup(QDialog):
         self.suggestion_list.raise_()
 
     def update_search_results(self, text):
-        if not searcher: return
-        backend_results = searcher.performSearch([self.component_name.lower()], text)
+        # Use the dynamic searcher from the manager
+        if not sor_manager or not sor_manager.searcher: return
+        
+        # Note: searcher logic is encapsulated in sor_backend
+        backend_results = sor_manager.searcher.performSearch([self.component_name.lower()], text)
         backend_items = [item['name'] for item in backend_results]
 
         data_py_items = []
@@ -233,8 +247,9 @@ class MaterialInputPopup(QDialog):
         backend_data = None
         data_py_data = None
         
-        if searcher:
-            backend_data = searcher.getDetailByName(text)
+        # Dynamically check searcher
+        if sor_manager and sor_manager.searcher:
+            backend_data = sor_manager.searcher.getDetailByName(text)
 
         if not backend_data:
             for key, val in self.material_data_source.items():
@@ -376,7 +391,8 @@ class MaterialInputPopup(QDialog):
         if self.save_db_check.isChecked():
             existing_keys = [k.lower() for k in self.material_data_source.keys()]
             backend_exists = False
-            if searcher and searcher.getDetailByName(name):
+            # Check dynamic searcher
+            if sor_manager and sor_manager.searcher and sor_manager.searcher.getDetailByName(name):
                 backend_exists = True
             if name.lower() in existing_keys or backend_exists:
                 errors.append(f"Material '{name}' already exists in the database.")
@@ -386,7 +402,8 @@ class MaterialInputPopup(QDialog):
             return
 
         is_custom = True
-        if searcher and searcher.getDetailByName(name):
+        # Check dynamic searcher
+        if sor_manager and sor_manager.searcher and sor_manager.searcher.getDetailByName(name):
             is_custom = False
         if is_custom:
             for key in self.material_data_source.keys():
@@ -645,7 +662,16 @@ class ComponentWidget(QWidget):
     def open_add_material_popup(self):
         selected_component = self.component_combobox.currentText()
         materials_data = self.data.get(selected_component, {})
-        popup = MaterialInputPopup(materials_data, selected_component, self)
+        
+        # --- NEW: Retrieve current Region and SOR from parent Foundation ---
+        current_region = "Unknown"
+        current_sor = "Unknown"
+        if self.parent_widget:
+            # Accessing the public combos from the Foundation parent
+            current_region = self.parent_widget.region_combo.currentText()
+            current_sor = self.parent_widget.sor_combo.currentText()
+            
+        popup = MaterialInputPopup(materials_data, selected_component, current_region, current_sor, self)
         if popup.exec() == QDialog.Accepted:
             data = popup.get_data()
             self.add_row_from_popup_data(data)
@@ -763,12 +789,14 @@ class ComponentWidget(QWidget):
             # Removed Grade update logic
             self.update_comp_units(type_material_input.text(), unit_combo_m3)
             
+            # Removed Grade target setting
+            
             target_unit = data.get(KEY_UNIT_M3, "")
             if target_unit:
                 if unit_combo_m3.findText(target_unit) == -1:
                     unit_combo_m3.addItem(target_unit)
                 unit_combo_m3.setCurrentText(target_unit)
-
+            
             quantity_edit.setText(data.get(KEY_QUANTITY, ""))
             rate_edit.setText(data.get(KEY_RATE, ""))
             rate_data_source_edit.setText(data.get(KEY_RATE_DATA_SOURCE, ""))
@@ -915,7 +943,6 @@ class ComponentWidget(QWidget):
         self.updateGeometry()
         self.adjustSize()
         self._on_value_changed()
-
 
     def remove_material_row_by_widgets(self, row_widgets_to_remove):
         if row_widgets_to_remove not in self.material_rows:
@@ -1234,9 +1261,47 @@ class Foundation(QWidget):
             }
         """)
         
-        left_panel_vlayout = QVBoxLayout(self)
-        left_panel_vlayout.setContentsMargins(0,0,0,0)
-        left_panel_vlayout.setSpacing(0)
+        self.left_panel_vlayout = QVBoxLayout(self)
+        self.left_panel_vlayout.setContentsMargins(0,0,0,0)
+        self.left_panel_vlayout.setSpacing(0)
+
+        # --- UPDATED HEADER FOR REGION / SOR (Additional Inputs) ---
+        header_container = QWidget()
+        header_container.setStyleSheet("background-color: #FFF9F9; border-bottom: 1px solid #ccc;")
+        header_layout = QHBoxLayout(header_container)
+        header_layout.setContentsMargins(15, 10, 15, 10)
+        
+        # 1. Region Input
+        header_layout.addWidget(QLabel("Region:"))
+        self.region_combo = QComboBox()
+        self.region_combo.setFixedWidth(150)
+        
+        # Load regions from manager or fallback
+        if sor_manager:
+            self.region_combo.addItems(sor_manager.get_regions())
+            # --- NEW: Connect to the backend signal for auto-refresh ---
+            sor_manager.registry_updated.connect(self.refresh_ui_options)
+        else:
+            self.region_combo.addItems(["India", "USA"]) # Fallback
+            
+        self.region_combo.currentTextChanged.connect(self.on_region_changed)
+        header_layout.addWidget(self.region_combo)
+        
+        header_layout.addSpacing(20)
+        
+        # 2. SOR Input
+        header_layout.addWidget(QLabel("Select SOR:"))
+        self.sor_combo = QComboBox()
+        self.sor_combo.setFixedWidth(200)
+        # Initialize SOR list based on current region
+        self.on_region_changed(self.region_combo.currentText()) 
+        self.sor_combo.currentTextChanged.connect(self.on_sor_changed)
+        header_layout.addWidget(self.sor_combo)
+        
+        header_layout.addStretch()
+        
+        # Add Header to Main Layout
+        self.left_panel_vlayout.addWidget(header_container)
 
         lock_hlayout = QHBoxLayout()
         lock_hlayout.setContentsMargins(0,2,2,0)
@@ -1285,7 +1350,7 @@ class Foundation(QWidget):
         self.add_component_layout()
 
         self.scroll_content_layout.addLayout(self.button_h_layout)
-        left_panel_vlayout.addWidget(self.scroll_area)
+        self.left_panel_vlayout.addWidget(self.scroll_area)
         self._initializing = False
 
     def showEvent(self, event):
@@ -1294,6 +1359,64 @@ class Foundation(QWidget):
             self.set_form_locked(True)
         else:
             self.is_first_visit = False
+
+    # --- NEW METHOD: Auto-Refresh UI Options ---
+    @Slot() # Explicitly marked as a Slot for robust Signal connection
+    def refresh_ui_options(self):
+        """Called automatically when SOR backend updates."""
+        print("UI: Refreshing Region/SOR dropdowns...")
+        
+        # Save current selection to restore it after refresh if possible
+        current_region = self.region_combo.currentText()
+        current_sor = self.sor_combo.currentText()
+        
+        # Reload Regions
+        self.region_combo.blockSignals(True)
+        self.region_combo.clear()
+        if sor_manager:
+            self.region_combo.addItems(sor_manager.get_regions())
+        else:
+            self.region_combo.addItems(["India", "USA"])
+        self.region_combo.blockSignals(False)
+        
+        # Restore Region Selection
+        idx = self.region_combo.findText(current_region)
+        if idx != -1:
+            self.region_combo.setCurrentIndex(idx)
+        elif self.region_combo.count() > 0:
+            self.region_combo.setCurrentIndex(0)
+            
+        # Trigger update for SOR list based on the (potentially new) region
+        self.on_region_changed(self.region_combo.currentText())
+        
+        # Restore SOR Selection
+        idx_sor = self.sor_combo.findText(current_sor)
+        if idx_sor != -1:
+            self.sor_combo.setCurrentIndex(idx_sor)
+
+    # --- NEW: Methods to Handle Region/SOR Changes ---
+    def on_region_changed(self, new_region):
+        """Update SOR dropdown when Region changes"""
+        if not sor_manager: return
+        sors = sor_manager.get_sors_for_region(new_region)
+        self.sor_combo.blockSignals(True)
+        self.sor_combo.clear()
+        self.sor_combo.addItems(sors)
+        self.sor_combo.blockSignals(False)
+        # Trigger update for the first SOR in the new list if available
+        if sors:
+            self.sor_combo.setCurrentIndex(0)
+            self.on_sor_changed(sors[0])
+
+    def on_sor_changed(self, new_sor):
+        """Tell backend to load new data when SOR changes"""
+        if not sor_manager or not new_sor: return
+        region = self.region_combo.currentText()
+        success, msg = sor_manager.set_active_sor(region, new_sor)
+        if success:
+            print(f"UI: Successfully loaded {new_sor}")
+        else:
+            print(f"UI: Failed to load {new_sor}: {msg}")
 
     def toggle_lock(self):
         self.set_form_locked(not self.is_locked)
@@ -1320,6 +1443,10 @@ class Foundation(QWidget):
         self.add_component_button.setProperty("locked_state", str(locked).lower())
         self.add_component_button.style().unpolish(self.add_component_button)
         self.add_component_button.style().polish(self.add_component_button)
+        
+        # Lock Header inputs too
+        self.region_combo.setEnabled(not locked)
+        self.sor_combo.setEnabled(not locked)
 
     # --- NEW: Helper method to handle triggering the warning with cooldown ---
     def trigger_lock_warning(self):
@@ -1354,6 +1481,8 @@ class Foundation(QWidget):
         from pprint import pprint
         data = self.collect_data()
         print("\nCollected Data from Foundation UI:")
+        # Include context in debug output
+        print(f"Context -> Region: {self.region_combo.currentText()}, SOR: {self.sor_combo.currentText()}")
         pprint(data)
             
         if self.data_id:

@@ -5,9 +5,10 @@
 <Email>: vidyarthiprerna637@gmail.com
 """
 from PySide6.QtCore import (QSize, Qt, QPropertyAnimation, QEasingCurve)
-from PySide6.QtGui import (QAction,QFont, QFontDatabase, QIcon)
+from PySide6.QtGui import (QAction, QFont, QFontDatabase, QIcon)
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QTextEdit, QScrollArea, QSpacerItem, QSizePolicy,
-    QMenu, QMenuBar, QPushButton, QWidget, QLabel, QVBoxLayout, QGridLayout, QLineEdit, QComboBox)
+                               QMenu, QMenuBar, QPushButton, QWidget, QLabel, QVBoxLayout, QGridLayout, 
+                               QLineEdit, QComboBox, QFileDialog, QDialog, QFormLayout, QDialogButtonBox)
 
 from osbridgelcca.desktop_app.widgets.title_bar import CustomTitleBar
 from osbridgelcca.desktop_app.widgets.project_details_right_widget import ProjectDetailsWidget
@@ -29,10 +30,11 @@ from osbridgelcca.desktop_app.widgets.tab_widget import CustomTabWidget
 from osbridgelcca.desktop_app.widgets.utils.data import *
 from osbridgelcca.desktop_app.widgets.utils.database import DatabaseManager
 from osbridgelcca.desktop_app.resources.resources_rc import *
-from PySide6.QtWidgets import QFileDialog
+
 import pandas as pd
 import json
 import numpy as np
+import os
 
 # ================== CHANGES MADE BY RITIK ==================
 # Excel Parsing & Validation Logic (INLINE)
@@ -70,7 +72,6 @@ def parse_and_validate_excel(file_path):
     global_warnings = []
 
     for sheet_name, df in all_sheets.items():
-
         current_section = None
         current_keys = None
         section_seen_data = {}
@@ -79,128 +80,121 @@ def parse_and_validate_excel(file_path):
             if row.isnull().all():
                 continue
 
+            # Convert first cell to string for checking
             first_val = str(row[0]).strip() if pd.notna(row[0]) else ""
+            
+            # Gather all values in the row to check for header keywords
+            row_values_lower = [str(x).lower().strip() for x in row if pd.notna(x)]
 
-            # 1. Identify Header (CID#)
+            # --- IMPROVED HEADER DETECTION ---
+            # 1. Identify Header Row (Looks for 'CID#' OR standard columns like 'unit'/'rate')
+            is_header = False
             if first_val.startswith('CID#'):
+                is_header = True
+            elif 'unit_a' in row_values_lower and 'rate' in row_values_lower: # relaxed check
+                is_header = True
+            elif 'unit' in row_values_lower and 'rate' in row_values_lower:
+                is_header = True
+            
+            if is_header:
                 current_keys = []
                 for i, val in enumerate(row):
                     if pd.notna(val) and str(val).strip() != "":
-                        current_keys.append((i, clean_header(str(val).strip())))
+                        # Remove CID# if present and clean up
+                        raw_header = str(val).replace('CID#', '').strip()
+                        # Convert to snake_case (e.g. "Rate Source" -> "rate_source")
+                        clean_key = raw_header.lower().replace(' ', '_').replace('.', '').replace('/', '_')
+
+                        # --- CRITICAL: Map common Excel headers to JSON keys ---
+                        if clean_key in ['type_of_material', 'material', 'item', 'description', 'particulars', 'name']:
+                            clean_key = 'name' # Map to 'name' for the Searcher
+                        elif clean_key in ['rate_source', 'source', 'rate_src', 'rate_data_source']:
+                            clean_key = 'rate_src'
+                        elif clean_key in ['carbon_emission', 'emission', 'carbon_emission_(kgco₂e_unit_b)']:
+                            clean_key = 'carbon_emission'
+                        elif clean_key in ['carbon_unit', 'emission_unit', 'carbon_emission_units']:
+                            clean_key = 'carbon_emission_units'
+                        elif clean_key in ['carbon_source', 'emission_source', 'carbon_factor_source']:
+                            clean_key = 'carbon_emission_src'
+                        elif clean_key in ['recyclable', 'recycleable']:
+                             clean_key = 'recycleable'
+                        elif clean_key in ['unit', 'unit_a']:
+                            clean_key = 'unit'
+                        elif clean_key in ['quantity', 'quantity_(unit_a)']:
+                            clean_key = 'quantity'
+                        elif clean_key in ['rate', 'rupees_unit_a']:
+                            clean_key = 'rate'
+                        
+                        current_keys.append((i, clean_key))
+                # print(f"DEBUG: Found header keys in {sheet_name}: {current_keys}") # Debug print
                 continue
 
-            # Skip visual headers
-            if first_val == 'Material':
+            # Skip visual headers or purely text rows if they are not the start of a section
+            if first_val.lower() in ['material', 'type of material']:
                 continue
 
-            # 2. Identify Section
+            # 2. Identify Section (Single non-empty cell in the row)
+            # Check if col 0 has value, and subsequent columns (2,3) are empty
             col2 = row[2] if len(row) > 2 else np.nan
             col3 = row[3] if len(row) > 3 else np.nan
 
-            if pd.notna(row[0]) and pd.isna(col2) and pd.isna(col3):
+            if pd.notna(row[0]) and pd.isna(col2) and pd.isna(col3) and not is_header:
+                # Close previous section
                 if current_section:
                     parsed_sections.append(current_section)
 
+                # Start new section
                 current_section = {
                     "sheetName": sheet_name,
-                    "type": first_val,
+                    "type": first_val, # e.g. "Excavation"
                     "data": []
                 }
+                # Reset keys only if we want strict sectioning, but usually headers persist
+                # We will keep current_keys unless a new header row is found
                 section_seen_data = {}
                 continue
 
             # 3. Process Data Row
             if current_section and current_keys:
                 raw_row_data = {}
+                # Extract data based on mapped keys
                 for col_idx, key in current_keys:
                     if col_idx < len(row):
                         val = row[col_idx]
-                        raw_row_data[key] = None if pd.isna(val) or str(val).strip() == "" else val
+                        raw_row_data[key] = val if pd.notna(val) and str(val).strip() != "" else None
                     else:
                         raw_row_data[key] = None
 
-                qty_val = raw_row_data.get('quantity')
-                if qty_val is None:
+                # VALIDATION: 
+                # For SOR files, Quantity is often empty. We MUST NOT skip rows just because quantity is missing.
+                # The only mandatory field is Name.
+                if not raw_row_data.get('name'):
                     continue
 
                 final_row_data = raw_row_data.copy()
-                row_has_critical_error = False
-                is_duplicate = False
-                row_context = get_row_identifier(sheet_name, current_section['type'], idx)
+                
+                # Handle Quantity: Default to 1 if missing (for SOR logic)
+                qty_val = raw_row_data.get('quantity')
+                if qty_val is None or not is_valid_number(qty_val):
+                    final_row_data['quantity'] = "1" # Default quantity for SOR items
 
-                # Quantity
-                if not is_valid_number(qty_val):
-                    global_errors.append(f"{row_context} - Error: Quantity '{qty_val}' is not a valid number.")
-                    row_has_critical_error = True
-
-                # Rate
-                rate_val = final_row_data.get('rate')
+                # Handle Rate: Default to 0 if missing
+                rate_val = raw_row_data.get('rate')
                 if rate_val is None or not is_valid_number(rate_val):
-                    global_errors.append(f"{row_context} - Error: Invalid or missing rate.")
-                    row_has_critical_error = True
+                    final_row_data['rate'] = "0"
+                
+                # Clean other fields
+                if final_row_data.get('carbon_emission') is None:
+                    final_row_data['carbon_emission'] = 'not_available'
+                
+                if final_row_data.get('recycleable') is None:
+                    final_row_data['recycleable'] = 'Non-recyclable'
 
-                # Sources (warnings)
-                if final_row_data.get('rate_src') is None:
-                    global_warnings.append(f"{row_context} - Warning: 'rate_src' is missing.")
-                if final_row_data.get('carbon_emission_src') is None:
-                    global_warnings.append(f"{row_context} - Warning: 'carbon_emission_src' is missing.")
+                # Add to section
+                current_section['data'].append(final_row_data)
 
-                # Flexible fields
-                for field in FLEXIBLE_FIELD_CONFIG:
-                    val = final_row_data.get(field)
-                    if val is not None:
-                        val_str = str(val).strip().lower()
-                        if not is_valid_number(val) and val_str not in ALLOWED_FLEXIBLE_VALUES:
-                            global_errors.append(
-                                f"{row_context} - Error: Field '{field}' value '{val}' is invalid."
-                            )
-                            row_has_critical_error = True
-
-                # Unit
-                unit_val = final_row_data.get('unit')
-                if not unit_val or str(unit_val).strip().lower() not in ALLOWED_UNITS:
-                    global_errors.append(f"{row_context} - Error: Invalid or missing unit.")
-                    row_has_critical_error = True
-
-                # Recyclable
-                recycle_val = final_row_data.get('recycleable')
-                if recycle_val is None or str(recycle_val).strip() == "":
-                    global_warnings.append(
-                        f"{row_context} - Warning: 'recycleable' blank, assumed non-recyclable."
-                    )
-                else:
-                    if str(recycle_val).strip().lower() not in ALLOWED_RECYCLE_VALUES:
-                        global_errors.append(
-                            f"{row_context} - Error: Invalid 'recycleable' value '{recycle_val}'."
-                        )
-                        row_has_critical_error = True
-
-                # Duplicate check
-                name_val = final_row_data.get('name')
-                if name_val:
-                    if name_val in section_seen_data:
-                        original = section_seen_data[name_val]
-                        if final_row_data == original['data']:
-                            global_warnings.append(
-                                f"{row_context} - Warning: Duplicate '{name_val}' merged."
-                            )
-                            is_duplicate = True
-                        else:
-                            global_errors.append(
-                                f"{row_context} - Error: Duplicate '{name_val}' with conflicts."
-                            )
-                            is_duplicate = True
-                    else:
-                        section_seen_data[name_val] = {
-                            "data": final_row_data,
-                            "row_id": row_context
-                        }
-
-                if not row_has_critical_error and not is_duplicate:
-                    current_section['data'].append(final_row_data)
-
-        if current_section:
-            parsed_sections.append(current_section)
+    if current_section:
+        parsed_sections.append(current_section)
 
     return {
         "validation_report": {
@@ -210,14 +204,36 @@ def parse_and_validate_excel(file_path):
         "parsed_data": parsed_sections
     }
 
-   
+# --- NEW CLASS: SOR Metadata Dialog ---
+class SORMetadataDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("SOR Details")
+        self.setFixedWidth(400)
+        self.layout = QFormLayout(self)
+        
+        self.region_input = QLineEdit()
+        self.region_input.setPlaceholderText("e.g. India")
+        self.sor_name_input = QLineEdit() 
+        self.sor_name_input.setPlaceholderText("e.g. Bihar SOR 2024")
+        
+        self.layout.addRow("Region:", self.region_input)
+        self.layout.addRow("SOR Name:", self.sor_name_input)
+        
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        self.layout.addRow(self.buttons)
 
-
+    def get_data(self):
+        return self.region_input.text(), self.sor_name_input.text()
 
 class UiMainWindow(object):
+    # --- MODIFIED: Open Excel Dialog with Metadata and JSON Generation ---
     def open_excel_dialog(self):
         print("Upload Excel clicked")
 
+        # 1. Get File
         file_path, _ = QFileDialog.getOpenFileName(
             None,
             "Select Excel File",
@@ -231,15 +247,25 @@ class UiMainWindow(object):
 
         print(f"\nSelected file: {file_path}")
 
+        # 2. Get Metadata (Region/Name) from User
+        dialog = SORMetadataDialog()
+        if dialog.exec() != QDialog.Accepted:
+            return
+        
+        region, sor_name = dialog.get_data()
+        
+        if not region or not sor_name:
+            print("Region and SOR Name are required.")
+            return
+
+        # 3. Parse and Validate
         result = parse_and_validate_excel(file_path)
 
         if result is None:
-            print("[FATAL] Parser returned None. Check parse_and_validate_excel().")
+            print("[FATAL] Parser returned None.")
             return
 
         try:
-            result = parse_and_validate_excel(file_path)
-
             validation = result.get("validation_report", {})
             errors = validation.get("errors", [])
             warnings = validation.get("warnings", [])
@@ -252,11 +278,47 @@ class UiMainWindow(object):
             for w in warnings or ["No warnings found"]:
                 print(w)
 
-            print("\n--- PARSED DATA ---")
-            print(json.dumps(result.get("parsed_data", []), indent=2))
+            # 4. Construct Final JSON Structure
+            parsed_data = result.get("parsed_data", [])
+            final_json = {
+                "metadata": {
+                    "region": region,
+                    "sor_name": sor_name,
+                    "source_file": file_path
+                },
+                "data": parsed_data
+            }
+
+            # 5. Save to sor_db
+            try:
+                from osbridgelcca.desktop_app.widgets.utils.sor_backend import DB_DIR, sor_manager
+                
+                # Ensure DB directory exists
+                if not os.path.exists(DB_DIR):
+                    os.makedirs(DB_DIR)
+
+                # Clean filename
+                safe_name = "".join([c for c in sor_name if c.isalnum() or c in (' ', '_')]).rstrip()
+                filename = f"{safe_name.replace(' ', '_').lower()}.json"
+                save_path = os.path.join(DB_DIR, filename)
+
+                with open(save_path, 'w') as f:
+                    json.dump(final_json, f, indent=4)
+                
+                print(f"Successfully saved SOR to {save_path}")
+                
+                # 6. Refresh Manager
+                if sor_manager:
+                    sor_manager.refresh_registry()
+                    print("Backend registry refreshed.")
+            
+            except ImportError:
+                print("Warning: sor_backend not found. JSON saved but registry not refreshed.")
+            except Exception as e:
+                print(f"Failed to save JSON to DB: {e}")
 
         except Exception as e:
-            print("[FATAL] Excel parsing failed")
+            print("[FATAL] Excel parsing or saving failed")
             print(e)
 
     def setupUi(self, MainWindow):

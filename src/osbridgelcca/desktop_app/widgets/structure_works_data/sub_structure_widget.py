@@ -1,69 +1,429 @@
-from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtCore import QCoreApplication, Qt, QSize, Signal
-from PySide6.QtWidgets import (QHBoxLayout, QPushButton, QLineEdit, QComboBox, QGridLayout, QWidget, QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy, QFrame, QMessageBox)
-from PySide6.QtGui import QIcon
-from PySide6.QtGui import QDoubleValidator
-from osbridgelcca.desktop_app.widgets.utils.data import *
+from PySide6.QtWidgets import (QApplication, QMainWindow, QDialog, QFormLayout, QCheckBox, QGroupBox,
+                               QHBoxLayout, QPushButton, QLineEdit, QComboBox, QGridLayout, QWidget, 
+                               QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy, QFrame, 
+                               QMessageBox, QCompleter, QListWidget, QAbstractItemView, QToolTip)
+from PySide6.QtCore import (QCoreApplication, Qt, QSize, Signal, QStringListModel, QPoint, QEvent, 
+                            QObject, QTimer, QRect, Slot) 
+from PySide6.QtGui import QIcon, QDoubleValidator, QIntValidator, QCursor
 import sys
 
-class ComponentWidget(QWidget):
-    def __init__(self, parent=None):
+# --- CONSTANTS FROM PROVIDED DATA ---
+DROPDOWN_UNITS = ["cum", "MT", "Rmt", "RMT", "m2", "number"]
+
+# --- IMPORTS ---
+from osbridgelcca.desktop_app.widgets.utils.data import *
+
+try:
+    # UPDATED IMPORT: Import manager instance
+    from osbridgelcca.desktop_app.widgets.utils.sor_backend import sor_manager
+except ImportError:
+    print("Warning: sor_backend.py not found. Search features will be limited.")
+    sor_manager = None
+
+# --- NEW: Event Filter for Locking Logic ---
+class LockEventFilter(QObject):
+    def __init__(self, main_widget):
+        super().__init__(main_widget)
+        self.main_widget = main_widget
+
+    def eventFilter(self, obj, event):
+        if not hasattr(self, 'main_widget') or self.main_widget is None:
+            return super().eventFilter(obj, event)
+
+        if getattr(self.main_widget, 'is_locked', False):
+            if event.type() in [QEvent.MouseButtonPress, QEvent.MouseButtonDblClick, 
+                                QEvent.KeyPress, QEvent.KeyRelease, QEvent.Wheel]:
+                self.main_widget.trigger_lock_warning()
+                return True
+        return super().eventFilter(obj, event)
+
+# --- UPDATED: MATERIAL INPUT POPUP ---
+class MaterialInputPopup(QDialog):
+    def __init__(self, material_data_source, component_name, current_region, current_sor, parent=None):
         super().__init__(parent)
-        self.parent_widget = parent
+        self.setWindowTitle("Material Details")
+        self.setFixedWidth(750) 
+        self.material_data_source = material_data_source
+        self.component_name = component_name
+        # Store context
+        self.current_region = current_region
+        self.current_sor = current_sor
+        
+        self.result_data = None
+        
+        self.init_ui()
+        
+    def init_ui(self):
+        self.setStyleSheet("""
+            QDialog { background-color: #ffffff; }
+            QLabel { font-size: 12px; color: #333; font-family: 'Segoe UI', sans-serif; }
+            QLineEdit, QComboBox {
+                border: 1px solid #cccccc; border-radius: 8px; padding: 6px 10px;
+                background-color: #fcfcfc; font-size: 12px;
+            }
+            QLineEdit:focus, QComboBox:focus { border: 1px solid #007BFF; background-color: #ffffff; }
+            QListWidget { border: 1px solid #cccccc; border-radius: 8px; background-color: #ffffff; outline: none; }
+            QListWidget::item { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+            QListWidget::item:selected { background-color: #e6f3ff; color: #000; }
+            QListWidget::item:hover { background-color: #f5f5f5; }
+            QPushButton { border-radius: 6px; padding: 8px 16px; font-weight: bold; }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
+        
+        # --- DYNAMIC HEADER ---
+        header_text_val = f"Region: {self.current_region}, Selected SOR: {self.current_sor}\nAdding in Sub-Structure > {self.component_name} Component"
+        
+        header_text = QLabel(header_text_val)
+        header_text.setStyleSheet("font-weight: bold; color: #2c3e50; font-size: 13px; margin-bottom: 5px;")
+        layout.addWidget(header_text)
+        
+        self.form_layout = QFormLayout()
+        self.form_layout.setSpacing(12)
+        self.form_layout.setLabelAlignment(Qt.AlignLeft)
+        
+        self.material_input = QLineEdit()
+        self.material_input.setPlaceholderText(f"Search {self.component_name}...")
+        self.material_input.textEdited.connect(self.update_search_results)
+        self.material_input.textChanged.connect(self.on_material_text_changed)
+        self.form_layout.addRow("Material", self.material_input)
+        
+        self.suggestion_list = QListWidget(self)
+        self.suggestion_list.setWindowFlags(Qt.SubWindow)
+        self.suggestion_list.setFocusPolicy(Qt.NoFocus)
+        self.suggestion_list.setFixedHeight(150) 
+        self.suggestion_list.setUniformItemSizes(True)
+        self.suggestion_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.suggestion_list.hide() 
+        self.suggestion_list.itemClicked.connect(self.on_suggestion_clicked)
+
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("font-size: 11px; margin-left: 2px;")
+        self.form_layout.addRow("", self.status_label)
+
+        # Removed Grade Input
+        
+        self.quantity_edit = QLineEdit()
+        self.quantity_edit.setValidator(QDoubleValidator(0.001, 9999999.99, 3))
+        self.form_layout.addRow("Quantity (Unit_A) *", self.quantity_edit)
+        
+        self.unit_combo = QComboBox()
+        self.unit_combo.setEditable(False)
+        self.unit_combo.setMinimumWidth(120)
+        self.unit_combo.addItems(DROPDOWN_UNITS)
+        self.form_layout.addRow("Unit_A *", self.unit_combo)
+        
+        self.rate_edit = QLineEdit()
+        self.rate_edit.setValidator(QDoubleValidator(0.0, 9999999.99, 2))
+        self.form_layout.addRow("Rupees/Unit_A *", self.rate_edit)
+        
+        self.rate_source_edit = QLineEdit()
+        self.form_layout.addRow("Rate source *", self.rate_source_edit)
+        
+        self.carbon_edit = QLineEdit()
+        self.carbon_edit.setPlaceholderText("Optional (or NA)")
+        self.form_layout.addRow("Carbon emission (kgCO₂e/Unit_B)", self.carbon_edit)
+        
+        self.carbon_unit_edit = QLineEdit()
+        self.form_layout.addRow("Carbon emission units", self.carbon_unit_edit)
+        
+        self.conv_factor_edit = QLineEdit()
+        self.conv_factor_edit.setValidator(QDoubleValidator(0.001, 9999999.99, 4))
+        self.form_layout.addRow("Conversion factor (Unit_A → Unit_B) *", self.conv_factor_edit)
+        
+        self.carbon_source_edit = QLineEdit()
+        self.form_layout.addRow("Carbon factor source", self.carbon_source_edit)
+        
+        layout.addLayout(self.form_layout)
+        
+        self.error_label = QLabel("")
+        self.error_label.setStyleSheet("color: #dc3545; font-weight: 600; font-size: 11px;")
+        self.error_label.setWordWrap(True)
+        layout.addWidget(self.error_label)
+
+        self.recyclable_check = QCheckBox("Recyclable")
+        layout.addWidget(self.recyclable_check)
+        
+        self.edit_check = QCheckBox("Edit")
+        self.edit_check.toggled.connect(self.on_edit_toggled)
+        self.edit_check.setVisible(False) 
+        layout.addWidget(self.edit_check)
+        
+        self.save_db_check = QCheckBox("Save to database")
+        self.save_db_check.setVisible(False)
+        layout.addWidget(self.save_db_check)
+        
+        layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        
+        self.add_btn = QPushButton("+ Add Material")
+        self.add_btn.setStyleSheet("background-color: #007BFF; color: white; border: none;")
+        self.add_btn.setCursor(Qt.PointingHandCursor)
+        self.add_btn.clicked.connect(self.validate_and_accept)
+        
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setStyleSheet("background-color: #f0f0f0; color: #333; border: 1px solid #ccc;")
+        self.cancel_btn.setCursor(Qt.PointingHandCursor)
+        self.cancel_btn.clicked.connect(self.reject)
+        
+        self.exit_btn = QPushButton("Exit")
+        self.exit_btn.setStyleSheet("background-color: #DC3545; color: white; border: none;")
+        self.exit_btn.setCursor(Qt.PointingHandCursor)
+        self.exit_btn.clicked.connect(self.reject)
+        
+        btn_layout.addWidget(self.add_btn)
+        btn_layout.addWidget(self.cancel_btn)
+        btn_layout.addWidget(self.exit_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        self.on_material_text_changed(self.material_input.text())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.suggestion_list.isVisible():
+            self.adjust_list_position()
+
+    def adjust_list_position(self):
+        if not self.material_input: return
+        pos = self.material_input.mapTo(self, QPoint(0, self.material_input.height()))
+        available_width = self.width() - pos.x() - 25 
+        self.suggestion_list.move(pos)
+        self.suggestion_list.setFixedWidth(available_width)
+        self.suggestion_list.raise_()
+
+    def update_search_results(self, text):
+        if not sor_manager or not sor_manager.searcher: return
+        
+        backend_results = sor_manager.searcher.performSearch([self.component_name.lower()], text)
+        backend_items = [item['name'] for item in backend_results]
+
+        data_py_items = []
+        if self.material_data_source:
+            norm_text = text.lower().strip()
+            tokens = norm_text.split()
+            for key in self.material_data_source.keys():
+                key_lower = key.lower()
+                if all(t in key_lower for t in tokens):
+                    data_py_items.append(key)
+
+        all_items = sorted(list(set(backend_items + data_py_items)))
+        self.suggestion_list.clear()
+        
+        if not text.strip():
+            self.suggestion_list.hide()
+            return
+
+        if all_items:
+            self.suggestion_list.addItems(all_items)
+            self.adjust_list_position() 
+            self.suggestion_list.show()
+        else:
+            self.suggestion_list.hide()
+
+    def on_suggestion_clicked(self, item):
+        self.material_input.setText(item.text())
+        self.suggestion_list.hide()
+
+    def on_material_text_changed(self, text):
+        self.error_label.setText("") 
+        backend_data = None
+        data_py_data = None
+        
+        if sor_manager and sor_manager.searcher:
+            backend_data = sor_manager.searcher.getDetailByName(text)
+
+        if not backend_data:
+            for key, val in self.material_data_source.items():
+                if key.lower() == text.lower():
+                    data_py_data = val
+                    break
+        
+        if backend_data:
+            self.status_label.setText(f"✅ Found standard material: {backend_data.get('name')}")
+            self.status_label.setStyleSheet("color: green; font-size: 11px; margin-left: 2px;")
+            self.edit_check.setVisible(True)
+            self.edit_check.setChecked(False)
+            self.save_db_check.setVisible(False)
+            
+            unit = backend_data.get("unit", "")
+            index = self.unit_combo.findText(unit)
+            if index != -1:
+                self.unit_combo.setCurrentIndex(index)
+            else:
+                self.unit_combo.addItem(unit)
+                self.unit_combo.setCurrentText(unit)
+            
+            self.rate_edit.setText(str(backend_data.get("rate", "")))
+            self.rate_source_edit.setText(backend_data.get("rate_src", ""))
+            self.carbon_edit.setText(str(backend_data.get("carbon_emission", "")))
+            self.carbon_unit_edit.setText(backend_data.get("carbon_emission_units", ""))
+            self.conv_factor_edit.setText(str(backend_data.get("conversion_factor", "")))
+            self.carbon_source_edit.setText(backend_data.get("carbon_emission_src", ""))
+            
+            is_recyclable = str(backend_data.get("recycleable", "")).lower() == "recyclable"
+            self.recyclable_check.setChecked(is_recyclable)
+            self.set_fields_readonly(True)
+            
+        elif data_py_data:
+            self.status_label.setText(f"✅ Found data material: {text}")
+            self.status_label.setStyleSheet("color: green; font-size: 11px; margin-left: 2px;")
+            self.edit_check.setVisible(True)
+            self.edit_check.setChecked(False)
+            self.save_db_check.setVisible(False)
+            
+            units = data_py_data.get(KEY_UNITS, [])
+            if units:
+                index = self.unit_combo.findText(units[0])
+                if index != -1:
+                    self.unit_combo.setCurrentIndex(index)
+            
+            self.set_fields_readonly(True)
+            
+            self.rate_edit.clear()
+            self.rate_source_edit.clear()
+            self.carbon_edit.clear()
+            self.carbon_unit_edit.clear()
+            self.conv_factor_edit.clear()
+            self.carbon_source_edit.clear()
+            self.recyclable_check.setChecked(False)
+            
+        else:
+            self.status_label.setText("") 
+            self.edit_check.setVisible(False)
+            self.save_db_check.setVisible(True)
+            self.set_fields_readonly(False)
+
+    def on_edit_toggled(self, checked):
+        if checked:
+            self.set_fields_readonly(False)
+            self.rate_source_edit.clear()
+            self.carbon_source_edit.clear()
+            self.save_db_check.setVisible(True)
+            self.save_db_check.setChecked(False)
+            self.edit_check.setVisible(False) 
+        else:
+            self.set_fields_readonly(True)
+            self.save_db_check.setVisible(False)
+
+    def set_fields_readonly(self, readonly):
+        self.unit_combo.setEnabled(not readonly)
+        self.rate_edit.setReadOnly(readonly)
+        self.rate_source_edit.setReadOnly(readonly)
+        self.carbon_edit.setReadOnly(readonly)
+        self.carbon_unit_edit.setReadOnly(readonly)
+        self.conv_factor_edit.setReadOnly(readonly)
+        self.carbon_source_edit.setReadOnly(readonly)
+        self.recyclable_check.setEnabled(not readonly)
+        
+        base_style = "border: 1px solid #ccc; border-radius: 8px; padding: 6px 10px;"
+        style = base_style + ("background-color: #E0E0E0;" if readonly else "background-color: #fcfcfc;")
+            
+        for widget in [self.rate_edit, self.rate_source_edit, self.carbon_edit, 
+                       self.carbon_unit_edit, self.conv_factor_edit, self.carbon_source_edit]:
+            widget.setStyleSheet(style)
+        self.unit_combo.setStyleSheet(style)
+
+    def validate_and_accept(self):
+        self.error_label.setText("")
+        name = self.material_input.text().strip()
+        if not name:
+            self.error_label.setText("Error: Material name is required.")
+            return
+
+        errors = []
+        try:
+            qty = float(self.quantity_edit.text())
+            if qty <= 0: errors.append("Quantity must be > 0.")
+        except ValueError:
+            errors.append("Quantity must be a valid number.")
+
+        if not self.unit_combo.currentText().strip():
+            errors.append("Unit cannot be empty.")
+
+        try:
+            price = float(self.rate_edit.text())
+            if price < 0: errors.append("Price must be a valid number.")
+        except ValueError:
+            errors.append("Price must be a valid number.")
+
+        if not self.rate_source_edit.text().strip():
+            errors.append("Rate Source is required.")
+        
+        conv_text = self.conv_factor_edit.text().strip()
+        if conv_text.lower() not in ["na", "not_available", "not available"]:
+            try:
+                conv = float(conv_text)
+                if conv <= 0: errors.append("Conversion Factor must be > 0.")
+            except ValueError:
+                errors.append("Conversion Factor must be a valid number.")
+
+        c_text = self.carbon_edit.text().strip()
+        if c_text and c_text.lower() not in ["na", "not_available", "not available"]:
+            try:
+                c_val = float(c_text)
+                if c_val < 0: errors.append("Carbon Emission must be ≥ 0.")
+            except ValueError:
+                errors.append("Carbon Emission must be a number or 'NA'.")
+
+        if self.save_db_check.isChecked():
+            existing_keys = [k.lower() for k in self.material_data_source.keys()]
+            backend_exists = False
+            if sor_manager and sor_manager.searcher and sor_manager.searcher.getDetailByName(name):
+                backend_exists = True
+            if name.lower() in existing_keys or backend_exists:
+                errors.append(f"Material '{name}' already exists in the database.")
+
+        if errors:
+            self.error_label.setText("\n".join(errors))
+            return
+
+        is_custom = True
+        if sor_manager and sor_manager.searcher and sor_manager.searcher.getDetailByName(name):
+            is_custom = False
+        if is_custom:
+            for key in self.material_data_source.keys():
+                if key.lower() == name.lower():
+                    is_custom = False; break
+
+        self.result_data = {
+            KEY_TYPE: name,
+            KEY_GRADE: "Standard",
+            KEY_QUANTITY: self.quantity_edit.text(),
+            KEY_UNIT_M3: self.unit_combo.currentText(),
+            KEY_RATE: self.rate_edit.text(),
+            KEY_RATE_DATA_SOURCE: self.rate_source_edit.text(),
+            "carbon_emission": self.carbon_edit.text(),
+            "carbon_unit": self.carbon_unit_edit.text(),
+            "conversion_factor": self.conv_factor_edit.text(),
+            "carbon_source": self.carbon_source_edit.text(),
+            "recyclable": self.recyclable_check.isChecked(),
+            "save_to_db": self.save_db_check.isChecked(),
+            "is_custom": is_custom
+        }
+        self.accept()
+
+    def get_data(self):
+        return self.result_data
+
+# --- COMPONENT WIDGET ---
+class ComponentWidget(QWidget):
+    def __init__(self, parent_widget, event_filter):
+        super().__init__(parent_widget)
+        self.parent_widget = parent_widget
+        self.lock_event_filter = event_filter 
         self._initializing = True
-        self.data = construction_materials.get(KEY_SUBSTRUCTURE)
+        self.is_locked = False 
+        self.data = construction_materials.get(KEY_SUBSTRUCTURE) # Using SubStructure key
         self.material_rows = []
         self.current_material_row_idx = 1
 
         self.init_ui()
         self._initializing = False
-
-    def set_locked(self, locked):
-        """Enable or disable all input widgets based on lock state"""
-        self.component_combobox.setEnabled(not locked)
-        self.add_material_button.setEnabled(not locked)
-        self.remove_component_button.setEnabled(not locked)
-        
-        for row in self.material_rows:
-            row[KEY_TYPE].setEnabled(not locked)
-            row[KEY_GRADE].setEnabled(not locked)
-            row[KEY_QUANTITY].setEnabled(not locked)
-            row[KEY_UNIT_M3].setEnabled(not locked)
-            row[KEY_RATE].setEnabled(not locked)
-            row[KEY_RATE_DATA_SOURCE].setEnabled(not locked)
-            row['remove_button'].setEnabled(not locked)
-
-    def collect_data(self):
-        rows_data = []
-        for row in self.material_rows:
-            component = self.component_combobox.currentText()
-            material_type = row[KEY_TYPE].currentText()
-            material_grade = row[KEY_GRADE].currentText()
-            quantity = row[KEY_QUANTITY].text()
-            unit_m3 = row[KEY_UNIT_M3].currentText()
-            rate = row[KEY_RATE].text()
-            rate_data_source = row[KEY_RATE_DATA_SOURCE].text()
-            row_dict = { KEY_COMPONENT: component,
-                         KEY_TYPE: material_type,
-                         KEY_GRADE: material_grade,
-                         KEY_QUANTITY: quantity if quantity.strip() else "0",
-                         KEY_UNIT_M3: unit_m3,
-                         KEY_RATE: rate if rate.strip() else "0.00",
-                         KEY_RATE_DATA_SOURCE: rate_data_source
-                        }
-            rows_data.append(row_dict) 
-        return rows_data       
-
-    def _on_value_changed(self, *_args):
-        if getattr(self, "_initializing", False):
-            return
-        if self.parent_widget and hasattr(self.parent_widget, "mark_state_changed"):
-            self.parent_widget.mark_state_changed()
-
-    def _on_type_material_changed(self, text, grade_widget, unit_widget):
-        self.update_comp_grades(text, grade_widget)
-        self.update_comp_units(text, unit_widget)
-        self._on_value_changed()
 
     def init_ui(self):
         self.component_first_scroll_content_layout = QVBoxLayout(self)
@@ -76,29 +436,35 @@ class ComponentWidget(QWidget):
         component_header_layout.addWidget(component_label)
 
         self.component_combobox = QComboBox()
-        self.component_combobox.addItems(self.data.keys())
         self.component_combobox.currentTextChanged.connect(self.update_comp_material)
+        self.component_combobox.installEventFilter(self.lock_event_filter) 
+        
+        comp_items = list(self.data.keys())
+        self.component_combobox.addItems(comp_items)
+
         self.component_combobox.currentTextChanged.connect(self._on_value_changed)
         self.component_combobox.setContentsMargins(0, 5, 0, 5)
         component_header_layout.addWidget(self.component_combobox)
 
         self.remove_component_button = QPushButton("x")
         self.remove_component_button.setFixedSize(24, 24)
+        self.remove_component_button.installEventFilter(self.lock_event_filter) 
         self.remove_component_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFCCCC;
                 border: 1px solid #FF9999;
                 border-radius: 12px;
                 font-weight: bold;
+                line-height:12px;
                 padding: 0px;
                 color: #CC0000;
             }
-            QPushButton:hover {
-                background-color: #FF9999;
-                color: white;
-            }
-            QPushButton:pressed {
-                background-color: #FF6666;
+            QPushButton:hover { background-color: #FF9999; color: white; }
+            QPushButton:pressed { background-color: #FF6666; }
+            QPushButton[locked_state="true"] {
+                background-color: #F8F8F8;
+                border: 1px solid #E0E0E0;
+                color: #CCCCCC;
             }
         """)
         component_header_layout.addWidget(self.remove_component_button)
@@ -110,12 +476,26 @@ class ComponentWidget(QWidget):
         self.material_grid_layout.setHorizontalSpacing(10)
         self.material_grid_layout.setVerticalSpacing(5)
 
-        headers = ["Type of Material", "Grade", "Quantity", "Unit", "Rate", "Rate Data Source"]
+        self.material_grid_layout.setColumnStretch(0, 2) 
+        self.material_grid_layout.setColumnStretch(1, 2) 
+        self.material_grid_layout.setColumnStretch(2, 3) 
+        self.material_grid_layout.setColumnStretch(3, 3) 
+        self.material_grid_layout.setColumnStretch(4, 3) 
+        self.material_grid_layout.setColumnStretch(5, 3) 
+        self.material_grid_layout.setColumnStretch(6, 0) 
+
+        # No Grade in headers
+        headers = ["Type of Material", "Quantity", "Unit", "Rate", "Rate Data Source"]
         for col, header_text in enumerate(headers):
             label = QLabel(header_text)
             label.setAlignment(Qt.AlignCenter)
             label.setObjectName("MaterialGridLabel")
-            self.material_grid_layout.addWidget(label, 0, col)
+            
+            if col == 0:
+                self.material_grid_layout.addWidget(label, 0, 0, 1, 2)
+            else:
+                grid_col = col + 1 
+                self.material_grid_layout.addWidget(label, 0, grid_col)
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
 
@@ -124,73 +504,174 @@ class ComponentWidget(QWidget):
 
         self.update_comp_material(self.component_combobox.currentText())
 
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch()
+
         self.add_material_button = QPushButton("+ Add Material")
         self.add_material_button.setObjectName("add_material_button")
-        self.add_material_button.clicked.connect(self.add_material_row)
-        self.component_first_scroll_content_layout.addWidget(self.add_material_button, alignment=Qt.AlignCenter)
+        self.add_material_button.installEventFilter(self.lock_event_filter) 
+        self.add_material_button.clicked.connect(self.open_add_material_popup)
+        buttons_layout.addWidget(self.add_material_button)
+        
+        buttons_layout.addStretch()
+        
+        self.component_first_scroll_content_layout.addLayout(buttons_layout)
+        
+    def set_locked(self, locked):
+        self.is_locked = locked
+        
+        def set_widget_locked(widget):
+            widget.setProperty("locked_state", str(locked).lower())
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
 
-    def update_comp_material(self, selected_component):
-        materials = self.data.get(selected_component).keys()
-        for i in range(len(self.material_rows)):
-            material_combo = self.material_rows[i][KEY_TYPE]
-            grade_combo = self.material_rows[i][KEY_GRADE]
-            unit_combo = self.material_rows[i][KEY_UNIT_M3]
-            material_combo.clear()
-            material_combo.addItems(materials)
-            current_text = material_combo.currentText()
-            if current_text:
-                self.update_comp_grades(current_text, grade_combo)
-                self.update_comp_units(current_text, unit_combo)
+        set_widget_locked(self.component_combobox)
+        set_widget_locked(self.add_material_button)
+        set_widget_locked(self.remove_component_button)
+        
+        for row in self.material_rows:
+            set_widget_locked(row[KEY_TYPE])
+            set_widget_locked(row[KEY_QUANTITY])
+            set_widget_locked(row[KEY_UNIT_M3])
+            set_widget_locked(row[KEY_RATE])
+            set_widget_locked(row[KEY_RATE_DATA_SOURCE])
+            set_widget_locked(row['remove_button'])
+   
+    def collect_data(self):
+        rows_data = []
+        for row in self.material_rows:
+            component = self.component_combobox.currentText()
+            
+            widget_type = row[KEY_TYPE]
+            if isinstance(widget_type, QComboBox):
+                material_type = widget_type.currentText()
+            else:
+                material_type = widget_type.text()
+
+            material_grade = "Standard"
+
+            widget_unit = row[KEY_UNIT_M3]
+            if isinstance(widget_unit, QComboBox):
+                unit_m3 = widget_unit.currentText()
+            else:
+                unit_m3 = widget_unit.text()
+
+            quantity = row[KEY_QUANTITY].text()
+            rate = row[KEY_RATE].text()
+            rate_data_source = row[KEY_RATE_DATA_SOURCE].text()
+            
+            row_dict = { KEY_COMPONENT: component,
+                         KEY_TYPE: material_type,
+                         KEY_GRADE: material_grade,
+                         KEY_QUANTITY: quantity if quantity.strip() else "0",
+                         KEY_UNIT_M3: unit_m3,
+                         KEY_RATE: rate if rate.strip() else "0.00",
+                         KEY_RATE_DATA_SOURCE: rate_data_source,
+                         "carbon_emission": row.get("carbon_emission", ""),
+                         "carbon_unit": row.get("carbon_unit", ""),
+                         "conversion_factor": row.get("conversion_factor", ""),
+                         "carbon_source": row.get("carbon_source", ""),
+                         "recyclable": row.get("recyclable", False),
+                         "save_to_db": row.get("save_to_db", False)
+                        }
+            rows_data.append(row_dict)
+        return rows_data
+
+    def _on_value_changed(self, *_args):
+        if getattr(self, "_initializing", False):
+            return
+        if self.parent_widget and hasattr(self.parent_widget, "mark_state_changed"):
+            self.parent_widget.mark_state_changed()
+
+    def _on_type_material_changed(self, text, unit_widget):
+        self.update_comp_units(text, unit_widget)
         self._on_value_changed()
 
-    def update_comp_grades(self, selected_material, widget):
-        selected_component = self.component_combobox.currentText()
-        grades = self.data.get(selected_component,{}).get(selected_material,{}).get(KEY_GRADE,[])
-        widget.clear()
-        widget.addItems(grades)
-    
-    def update_comp_units(self, selected_material, widget):
-        selected_component = self.component_combobox.currentText()
-        units = self.data.get(selected_component,{}).get(selected_material,{}).get(KEY_UNITS,[])
-        widget.clear()
-        widget.addItems(units)
+    def update_comp_material(self, selected_component):
+        comp_data = self.data.get(selected_component, {})
+        materials = comp_data.keys()
 
-    def add_material_row(self):
+        for i in range(len(self.material_rows)):
+            material_widget = self.material_rows[i][KEY_TYPE]
+            unit_combo = self.material_rows[i][KEY_UNIT_M3]
+            
+            if isinstance(material_widget, QComboBox):
+                material_widget.clear()
+                material_widget.addItems(materials)
+                current_text = material_widget.currentText()
+                if current_text:
+                    self.update_comp_units(current_text, unit_combo)
+            
+            elif isinstance(material_widget, QLineEdit):
+                current_text = material_widget.text()
+                if current_text:
+                    self.update_comp_units(current_text, unit_combo)
+
+        self._on_value_changed()
+   
+    def update_comp_units(self, selected_material, widget):
+        widget.clear()
+        widget.addItems(DROPDOWN_UNITS)
+
+    def open_add_material_popup(self):
+        selected_component = self.component_combobox.currentText()
+        materials_data = self.data.get(selected_component, {})
+        
+        current_region = "Unknown"
+        current_sor = "Unknown"
+        if self.parent_widget:
+            current_region = self.parent_widget.region_combo.currentText()
+            current_sor = self.parent_widget.sor_combo.currentText()
+            
+        popup = MaterialInputPopup(materials_data, selected_component, current_region, current_sor, self)
+        if popup.exec() == QDialog.Accepted:
+            data = popup.get_data()
+            self.add_row_from_popup_data(data)
+
+    def add_row_from_popup_data(self, data):
+        if data.get('is_custom', False):
+            self.add_custom_material_row(data)
+        else:
+            self.add_material_row(data)
+
+    def add_custom_material_row(self, data=None):
         validator = QDoubleValidator()
-        validator.setRange(0.0, 999999.99, 2)
+        validator.setRange(0.0, 9999999.999, 3)
         validator.setBottom(0.0)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
-    
+   
         row_widgets = {}
         row_idx = self.current_material_row_idx
-
-        fixed_input_width = 80
-
-        type_material_combo = QComboBox()
-        type_material_combo.setObjectName("MaterialGridInput")
-        type_material_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.material_grid_layout.addWidget(type_material_combo, row_idx, 0)
-        row_widgets[KEY_TYPE] = type_material_combo
-
-        grade_combo = QComboBox()
-        grade_combo.setObjectName("MaterialGridInput")
-        grade_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.material_grid_layout.addWidget(grade_combo, row_idx, 1)
-        row_widgets[KEY_GRADE] = grade_combo
-        grade_combo.currentTextChanged.connect(self._on_value_changed)
+        
+        type_material_input = QLineEdit()
+        type_material_input.setPlaceholderText("Enter custom material")
+        type_material_input.setObjectName("MaterialGridInput")
+        type_material_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        type_material_input.installEventFilter(self.lock_event_filter)
+        type_material_input.setReadOnly(True)
+        type_material_input.setStyleSheet("background-color: #FFFFFF; color: #000000;")
+        
+        self.material_grid_layout.addWidget(type_material_input, row_idx, 0, 1, 2)
+        row_widgets[KEY_TYPE] = type_material_input
+        type_material_input.textChanged.connect(self._on_value_changed)
 
         quantity_edit = QLineEdit()
         quantity_edit.setValidator(validator)
         quantity_edit.setPlaceholderText("0")
         quantity_edit.setObjectName("MaterialGridInput")
         quantity_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        quantity_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(quantity_edit, row_idx, 2)
         row_widgets[KEY_QUANTITY] = quantity_edit
         quantity_edit.textChanged.connect(self._on_value_changed)
 
         unit_combo_m3 = QComboBox()
+        unit_combo_m3.setEditable(False)
+        unit_combo_m3.setMinimumWidth(120) 
+        unit_combo_m3.addItems(DROPDOWN_UNITS)
         unit_combo_m3.setObjectName("MaterialGridInput")
         unit_combo_m3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        unit_combo_m3.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(unit_combo_m3, row_idx, 3)
         row_widgets[KEY_UNIT_M3] = unit_combo_m3
         unit_combo_m3.currentTextChanged.connect(self._on_value_changed)
@@ -200,6 +681,7 @@ class ComponentWidget(QWidget):
         rate_edit.setPlaceholderText("0.00")
         rate_edit.setObjectName("MaterialGridInput")
         rate_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(rate_edit, row_idx, 4)
         row_widgets[KEY_RATE] = rate_edit
         rate_edit.textChanged.connect(self._on_value_changed)
@@ -207,53 +689,183 @@ class ComponentWidget(QWidget):
         rate_data_source_edit = QLineEdit()
         rate_data_source_edit.setObjectName("MaterialGridInput")
         rate_data_source_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_data_source_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(rate_data_source_edit, row_idx, 5)
         row_widgets[KEY_RATE_DATA_SOURCE] = rate_data_source_edit
         rate_data_source_edit.textChanged.connect(self._on_value_changed)
 
         remove_button = QPushButton("x")
         remove_button.setFixedSize(24, 24)
+        remove_button.installEventFilter(self.lock_event_filter) 
         remove_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFCCCC;
                 border: 1px solid #FF9999;
                 border-radius: 12px;
                 font-weight: bold;
+                line-height:12px;
                 padding: 0px;
                 color: #CC0000;
             }
-            QPushButton:hover {
-                background-color: #FF9999;
-                color: white;
-            }
-            QPushButton:pressed {
-                background-color: #FF6666;
+            QPushButton:hover { background-color: #FF9999; color: white; }
+            QPushButton:pressed { background-color: #FF6666; }
+            QPushButton[locked_state="true"] {
+                background-color: #F8F8F8;
+                border: 1px solid #E0E0E0;
+                color: #CCCCCC;
             }
         """)
         remove_button.clicked.connect(lambda: self.remove_material_row_by_widgets(row_widgets))
-        self.material_grid_layout.addWidget(remove_button, row_idx, 6)
+        
+        self.material_grid_layout.addWidget(remove_button, row_idx, 6, alignment=Qt.AlignCenter)
+        
         row_widgets['remove_button'] = remove_button
 
-        type_material_combo.currentTextChanged.connect(
-            lambda text, grade_widget=grade_combo, unit_widget=unit_combo_m3: self._on_type_material_changed(text, grade_widget, unit_widget)
-        )
+        if data:
+            type_material_input.setText(data.get(KEY_TYPE, ""))
+            self.update_comp_units(type_material_input.text(), unit_combo_m3)
+            
+            target_unit = data.get(KEY_UNIT_M3, "")
+            if target_unit:
+                if unit_combo_m3.findText(target_unit) == -1:
+                    unit_combo_m3.addItem(target_unit)
+                unit_combo_m3.setCurrentText(target_unit)
+            
+            quantity_edit.setText(data.get(KEY_QUANTITY, ""))
+            rate_edit.setText(data.get(KEY_RATE, ""))
+            rate_data_source_edit.setText(data.get(KEY_RATE_DATA_SOURCE, ""))
+            
+            row_widgets["carbon_emission"] = data.get("carbon_emission")
+            row_widgets["carbon_unit"] = data.get("carbon_unit")
+            row_widgets["conversion_factor"] = data.get("conversion_factor")
+            row_widgets["carbon_source"] = data.get("carbon_source")
+            row_widgets["recyclable"] = data.get("recyclable")
+            row_widgets["save_to_db"] = data.get("save_to_db")
 
         self.material_rows.append(row_widgets)
         self.current_material_row_idx += 1
-        
-        selected_component = self.component_combobox.currentText()
-        materials = list(self.data.get(selected_component, {}).keys())
-        type_material_combo.addItems(materials)
-        
-        if materials:
-            first_material = materials[0]
-            self.update_comp_grades(first_material, grade_combo)
-            self.update_comp_units(first_material, unit_combo_m3)
         
         self.updateGeometry()
         self.adjustSize()
         self._on_value_changed()
 
+    def add_material_row(self, data=None):
+        validator = QDoubleValidator()
+        validator.setRange(0.0, 9999999.999, 3)
+        validator.setBottom(0.0)
+        validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+   
+        row_widgets = {}
+        row_idx = self.current_material_row_idx
+
+        type_material_input = QLineEdit()
+        type_material_input.setObjectName("MaterialGridInput")
+        type_material_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        type_material_input.installEventFilter(self.lock_event_filter)
+        type_material_input.setReadOnly(True)
+        type_material_input.setStyleSheet("background-color: #FFFFFF; color: #000000;")
+        
+        self.material_grid_layout.addWidget(type_material_input, row_idx, 0, 1, 2)
+        row_widgets[KEY_TYPE] = type_material_input
+        type_material_input.textChanged.connect(self._on_value_changed)
+
+        quantity_edit = QLineEdit()
+        quantity_edit.setValidator(validator)
+        quantity_edit.setPlaceholderText("0")
+        quantity_edit.setObjectName("MaterialGridInput")
+        quantity_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        quantity_edit.installEventFilter(self.lock_event_filter) 
+        self.material_grid_layout.addWidget(quantity_edit, row_idx, 2)
+        row_widgets[KEY_QUANTITY] = quantity_edit
+        quantity_edit.textChanged.connect(self._on_value_changed)
+
+        unit_combo_m3 = QComboBox()
+        unit_combo_m3.setEditable(False)
+        unit_combo_m3.setMinimumWidth(120)
+        unit_combo_m3.addItems(DROPDOWN_UNITS)
+        unit_combo_m3.setObjectName("MaterialGridInput")
+        unit_combo_m3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        unit_combo_m3.installEventFilter(self.lock_event_filter) 
+        self.material_grid_layout.addWidget(unit_combo_m3, row_idx, 3)
+        row_widgets[KEY_UNIT_M3] = unit_combo_m3
+        unit_combo_m3.currentTextChanged.connect(self._on_value_changed)
+
+        rate_edit = QLineEdit()
+        rate_edit.setValidator(validator)
+        rate_edit.setPlaceholderText("0.00")
+        rate_edit.setObjectName("MaterialGridInput")
+        rate_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_edit.installEventFilter(self.lock_event_filter) 
+        self.material_grid_layout.addWidget(rate_edit, row_idx, 4)
+        row_widgets[KEY_RATE] = rate_edit
+        rate_edit.textChanged.connect(self._on_value_changed)
+
+        rate_data_source_edit = QLineEdit()
+        rate_data_source_edit.setObjectName("MaterialGridInput")
+        rate_data_source_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_data_source_edit.installEventFilter(self.lock_event_filter) 
+        self.material_grid_layout.addWidget(rate_data_source_edit, row_idx, 5)
+        row_widgets[KEY_RATE_DATA_SOURCE] = rate_data_source_edit
+        rate_data_source_edit.textChanged.connect(self._on_value_changed)
+
+        remove_button = QPushButton("x")
+        remove_button.setFixedSize(24, 24)
+        remove_button.installEventFilter(self.lock_event_filter) 
+        remove_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FFCCCC;
+                border: 1px solid #FF9999;
+                border-radius: 12px;
+                font-weight: bold;
+                line-height:12px;
+                padding: 0px;
+                color: #CC0000;
+            }
+            QPushButton:hover { background-color: #FF9999; color: white; }
+            QPushButton:pressed { background-color: #FF6666; }
+            QPushButton[locked_state="true"] {
+                background-color: #F8F8F8;
+                border: 1px solid #E0E0E0;
+                color: #CCCCCC;
+            }
+        """)
+        remove_button.clicked.connect(lambda: self.remove_material_row_by_widgets(row_widgets))
+        
+        self.material_grid_layout.addWidget(remove_button, row_idx, 6, alignment=Qt.AlignCenter)
+        
+        row_widgets['remove_button'] = remove_button
+        
+        type_material_input.textChanged.connect(
+            lambda text, unit_widget=unit_combo_m3: self._on_type_material_changed(text, unit_widget)
+        )
+
+        self.material_rows.append(row_widgets)
+        self.current_material_row_idx += 1
+        
+        if data:
+            type_material_input.setText(data.get(KEY_TYPE, ""))
+            self.update_comp_units(type_material_input.text(), unit_combo_m3)
+            
+            target_unit = data.get(KEY_UNIT_M3, "")
+            if target_unit:
+                if unit_combo_m3.findText(target_unit) == -1:
+                    unit_combo_m3.addItem(target_unit)
+                unit_combo_m3.setCurrentText(target_unit)
+            
+            quantity_edit.setText(data.get(KEY_QUANTITY, ""))
+            rate_edit.setText(data.get(KEY_RATE, ""))
+            rate_data_source_edit.setText(data.get(KEY_RATE_DATA_SOURCE, ""))
+            
+            row_widgets["carbon_emission"] = data.get("carbon_emission")
+            row_widgets["carbon_unit"] = data.get("carbon_unit")
+            row_widgets["conversion_factor"] = data.get("conversion_factor")
+            row_widgets["carbon_source"] = data.get("carbon_source")
+            row_widgets["recyclable"] = data.get("recyclable")
+            row_widgets["save_to_db"] = data.get("save_to_db")
+
+        self.updateGeometry()
+        self.adjustSize()
+        self._on_value_changed()
 
     def remove_material_row_by_widgets(self, row_widgets_to_remove):
         if row_widgets_to_remove not in self.material_rows:
@@ -293,7 +905,12 @@ class ComponentWidget(QWidget):
                     if item.widget():
                         widget = item.widget()
                         self.material_grid_layout.removeWidget(widget)
-                        self.material_grid_layout.addWidget(widget, r_idx, c_idx)
+                        if c_idx == 6:
+                            self.material_grid_layout.addWidget(widget, r_idx, c_idx, alignment=Qt.AlignCenter)
+                        elif c_idx == 0:
+                             self.material_grid_layout.addWidget(widget, r_idx, 0, 1, 2)
+                        else:
+                            self.material_grid_layout.addWidget(widget, r_idx, c_idx)
                     elif item.layout():
                         layout = item.layout()
                         self.material_grid_layout.removeItem(layout)
@@ -319,7 +936,10 @@ class SubStructure(QWidget):
         self.state_changed = True
         self.is_first_visit = True
         self.is_locked = False
+        self.warning_cooldown = False
         
+        self.lock_filter = LockEventFilter(self)
+
         self.setStyleSheet("""
             #central_panel_widget {
                 background-color: #F8F8F8;
@@ -447,8 +1067,8 @@ class SubStructure(QWidget):
             }
             
             QPushButton#lock_button {
-                background: transparent;
-                border: 1px solid #E0E0E0;
+                background-color: #FFF8DC; 
+                border: 2px solid #DAA520; 
                 border-radius: 12px;
                 color: #3F3E5E;
                 padding: 2px 2px;
@@ -456,24 +1076,28 @@ class SubStructure(QWidget):
                 font-weight: bold;
             }
             QPushButton#lock_button:hover {
-                background: transparent;
+                background-color: #FFE4B5;
                 border-color: #C0C0C0;
             }
             QPushButton#lock_button[locked="true"] {
-                background: transparent;
+                background-color: #FFEEEE;
                 border-color: #FF9999;
                 color: #CC0000;
             }
             QPushButton#lock_button[locked="false"] {
-                background: transparent;
+                background-color: #E8F5E9;
                 border-color: #45913E;
                 color: #00AA00;
             }
             
+            QLineEdit {
+                text-align: center;
+            }
             QComboBox {
                 border: 1px solid #DDDCE0;
                 border-radius: 10px;
                 padding: 3px 10px;
+                text-align: center;
             }
             QComboBox::drop-down {
                 border: none;
@@ -540,11 +1164,54 @@ class SubStructure(QWidget):
                 color: #AAAAAA;
                 border-color: #D0D0D0;
             }
+            
+            QPushButton#add_material_button[locked_state="true"], 
+            QPushButton#add_component_button[locked_state="true"] {
+                background-color: #F0F0F0;
+                color: #AAAAAA;
+                border-color: #D0D0D0;
+            }
+            #MaterialGridInput[locked_state="true"] {
+                background-color: #E0E0E0;
+                color: #888888;
+                border: 1px solid #D0D0D0;
+            }
         """)
         
-        left_panel_vlayout = QVBoxLayout(self)
-        left_panel_vlayout.setContentsMargins(0, 0, 0, 0)
-        left_panel_vlayout.setSpacing(0)
+        self.left_panel_vlayout = QVBoxLayout(self)
+        self.left_panel_vlayout.setContentsMargins(0, 0, 0, 0)
+        self.left_panel_vlayout.setSpacing(0)
+
+        header_container = QWidget()
+        header_container.setStyleSheet("background-color: #FFF9F9; border-bottom: 1px solid #ccc;")
+        header_layout = QHBoxLayout(header_container)
+        header_layout.setContentsMargins(15, 10, 15, 10)
+        
+        header_layout.addWidget(QLabel("Region:"))
+        self.region_combo = QComboBox()
+        self.region_combo.setFixedWidth(150)
+        
+        if sor_manager:
+            self.region_combo.addItems(sor_manager.get_regions())
+            sor_manager.registry_updated.connect(self.refresh_ui_options)
+        else:
+            self.region_combo.addItems(["India", "USA"]) 
+            
+        self.region_combo.currentTextChanged.connect(self.on_region_changed)
+        header_layout.addWidget(self.region_combo)
+        
+        header_layout.addSpacing(20)
+        
+        header_layout.addWidget(QLabel("Select SOR:"))
+        self.sor_combo = QComboBox()
+        self.sor_combo.setFixedWidth(200)
+        self.on_region_changed(self.region_combo.currentText()) 
+        self.sor_combo.currentTextChanged.connect(self.on_sor_changed)
+        header_layout.addWidget(self.sor_combo)
+        
+        header_layout.addStretch()
+        
+        self.left_panel_vlayout.addWidget(header_container)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
@@ -565,15 +1232,18 @@ class SubStructure(QWidget):
 
         self.lock_button = QPushButton("🔓")
         self.lock_button.setObjectName("lock_button")
-        self.lock_button.setFixedSize(24, 24)
+        self.lock_button.setFixedSize(30, 30) 
+        self.lock_button.setCursor(Qt.PointingHandCursor)
         self.lock_button.setProperty("locked", "false")
         self.lock_button.clicked.connect(self.toggle_lock)
+        self.lock_button.setToolTip("Click to Lock Editing") 
         lock_hlayout.addWidget(self.lock_button)
 
         self.scroll_content_layout.addLayout(lock_hlayout)
 
         self.add_component_button = QPushButton("+ Add Component")
         self.add_component_button.setObjectName("add_component_button")
+        self.add_component_button.installEventFilter(self.lock_filter)
         self.add_component_button.clicked.connect(self.add_component_layout)
 
         self.button_h_layout = QHBoxLayout()
@@ -595,7 +1265,7 @@ class SubStructure(QWidget):
         self.add_component_layout()
 
         self.scroll_content_layout.addLayout(self.button_h_layout)
-        left_panel_vlayout.addWidget(self.scroll_area)
+        self.left_panel_vlayout.addWidget(self.scroll_area)
         self._initializing = False
 
     def showEvent(self, event):
@@ -604,6 +1274,52 @@ class SubStructure(QWidget):
             self.set_form_locked(True)
         else:
             self.is_first_visit = False
+
+    @Slot()
+    def refresh_ui_options(self):
+        print("UI: Refreshing Region/SOR dropdowns...")
+        current_region = self.region_combo.currentText()
+        current_sor = self.sor_combo.currentText()
+        
+        self.region_combo.blockSignals(True)
+        self.region_combo.clear()
+        if sor_manager:
+            self.region_combo.addItems(sor_manager.get_regions())
+        else:
+            self.region_combo.addItems(["India", "USA"])
+        self.region_combo.blockSignals(False)
+        
+        idx = self.region_combo.findText(current_region)
+        if idx != -1:
+            self.region_combo.setCurrentIndex(idx)
+        elif self.region_combo.count() > 0:
+            self.region_combo.setCurrentIndex(0)
+            
+        self.on_region_changed(self.region_combo.currentText())
+        
+        idx_sor = self.sor_combo.findText(current_sor)
+        if idx_sor != -1:
+            self.sor_combo.setCurrentIndex(idx_sor)
+
+    def on_region_changed(self, new_region):
+        if not sor_manager: return
+        sors = sor_manager.get_sors_for_region(new_region)
+        self.sor_combo.blockSignals(True)
+        self.sor_combo.clear()
+        self.sor_combo.addItems(sors)
+        self.sor_combo.blockSignals(False)
+        if sors:
+            self.sor_combo.setCurrentIndex(0)
+            self.on_sor_changed(sors[0])
+
+    def on_sor_changed(self, new_sor):
+        if not sor_manager or not new_sor: return
+        region = self.region_combo.currentText()
+        success, msg = sor_manager.set_active_sor(region, new_sor)
+        if success:
+            print(f"UI: Successfully loaded {new_sor}")
+        else:
+            print(f"UI: Failed to load {new_sor}: {msg}")
 
     def toggle_lock(self):
         self.set_form_locked(not self.is_locked)
@@ -614,9 +1330,11 @@ class SubStructure(QWidget):
         if locked:
             self.lock_button.setText("🔒")
             self.lock_button.setProperty("locked", "true")
+            self.lock_button.setToolTip("Click to Unlock to Edit")
         else:
             self.lock_button.setText("🔓")
             self.lock_button.setProperty("locked", "false")
+            self.lock_button.setToolTip("Click to Lock Editing")
         
         self.lock_button.style().unpolish(self.lock_button)
         self.lock_button.style().polish(self.lock_button)
@@ -624,10 +1342,27 @@ class SubStructure(QWidget):
         for component_widget in self.component_widgets:
             component_widget.set_locked(locked)
         
-        self.add_component_button.setEnabled(not locked)
+        self.add_component_button.setProperty("locked_state", str(locked).lower())
+        self.add_component_button.style().unpolish(self.add_component_button)
+        self.add_component_button.style().polish(self.add_component_button)
+        
+        self.region_combo.setEnabled(not locked)
+        self.sor_combo.setEnabled(not locked)
+
+    def trigger_lock_warning(self):
+        if self.warning_cooldown:
+            return
+        self.warning_cooldown = True
+        if self.lock_button:
+            global_pos = self.lock_button.mapToGlobal(QPoint(-80, self.lock_button.height() + 5))
+            QToolTip.showText(global_pos, "Unlock to Edit", self.lock_button, self.lock_button.rect(), 2000)
+        QTimer.singleShot(2000, self._reset_warning_cooldown)
+
+    def _reset_warning_cooldown(self):
+        self.warning_cooldown = False
 
     def add_component_layout(self):
-        new_component = ComponentWidget(self)
+        new_component = ComponentWidget(self, self.lock_filter)
         self.component_widgets.append(new_component)
         new_component.remove_component_button.clicked.connect(lambda: self.remove_component_layout(new_component))
 
@@ -637,9 +1372,7 @@ class SubStructure(QWidget):
             self.scroll_content_layout.removeItem(self.button_h_layout)
 
         self.scroll_content_layout.addWidget(new_component)
-
         self.scroll_content_layout.addWidget(self.add_component_button, alignment=Qt.AlignCenter)
-
         self.scroll_content_layout.addLayout(self.button_h_layout)
 
         if self.is_locked:
@@ -674,10 +1407,11 @@ class SubStructure(QWidget):
         from pprint import pprint
         data = self.collect_data()
         print("\nCollected Data from Sub-Structure UI:")
+        print(f"Context -> Region: {self.region_combo.currentText()}, SOR: {self.sor_combo.currentText()}")
         pprint(data)
             
         if self.data_id:
-            self.data_id = self.database_manager.replace_structure_work_rows(KEY_SUBSTRUCTURE, data, self.data_id)
+            self.database_manager.replace_structure_work_rows(KEY_SUBSTRUCTURE, data, self.data_id)
         else:
             self.data_id = self.database_manager.input_data_row(KEY_SUBSTRUCTURE, data)
         self.state_changed = False
@@ -696,8 +1430,9 @@ class SubStructure(QWidget):
         self.next.emit(KEY_SUBSTRUCTURE)
 
     def expand_scroll_area(self):
-        self.central_widget.layout().invalidate()
-    
+        # self.central_widget.layout().invalidate()
+        pass
+
     def close_widget(self):
         self.closed.emit()
         self.setParent(None)
