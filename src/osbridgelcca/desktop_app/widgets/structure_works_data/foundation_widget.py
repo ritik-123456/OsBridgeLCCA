@@ -1,1166 +1,178 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QDialog, QFormLayout, QCheckBox, QGroupBox
-from PySide6.QtCore import QCoreApplication, Qt, QSize, Signal, QStringListModel
-from PySide6.QtWidgets import (QHBoxLayout, QPushButton, QLineEdit, QComboBox, QGridLayout, QWidget, 
-                               QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy, QFrame, QMessageBox, QCompleter)
-from PySide6.QtGui import QIcon, QDoubleValidator, QIntValidator
-from osbridgelcca.desktop_app.widgets.utils.data import *
+from PySide6.QtWidgets import (QApplication, QMainWindow, QDialog, QFormLayout, QCheckBox, QGroupBox,
+                               QHBoxLayout, QPushButton, QLineEdit, QComboBox, QGridLayout, QWidget, 
+                               QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy, QFrame, 
+                               QMessageBox, QCompleter, QListWidget, QAbstractItemView, QToolTip)
+from PySide6.QtCore import (QCoreApplication, Qt, QSize, Signal, QStringListModel, QPoint, QEvent, 
+                            QObject, QTimer, QRect) 
+from PySide6.QtGui import QIcon, QDoubleValidator, QIntValidator, QCursor
 import sys
 
-# --- UPDATED: MATERIAL INPUT POPUP WITH COMPONENT-SPECIFIC FILTERING ---
+# --- CONSTANTS FROM PROVIDED DATA ---
+# Extracted unique units from the JSON data provided
+DROPDOWN_UNITS = ["cum", "MT", "Rmt", "RMT", "m2", "number"]
+
+# --- IMPORTS ---
+# Assuming these exist in your project structure
+from osbridgelcca.desktop_app.widgets.utils.data import *
+
+try:
+    from osbridgelcca.desktop_app.widgets.utils.sor_backend import searcher
+except ImportError:
+    print("Warning: sor_backend.py not found. Search features will be limited.")
+    searcher = None
+
+# --- NEW: Event Filter for Locking Logic (Fixed Flickering) ---
+class LockEventFilter(QObject):
+    def __init__(self, foundation_widget):
+        super().__init__()
+        self.foundation = foundation_widget
+
+    def eventFilter(self, obj, event):
+        # Only intercept interaction events if the Foundation is locked
+        if self.foundation.is_locked:
+            # Check for Mouse Clicks, Key Presses, or Wheel scrolls
+            if event.type() in [QEvent.MouseButtonPress, QEvent.MouseButtonDblClick, 
+                                QEvent.KeyPress, QEvent.KeyRelease, QEvent.Wheel]:
+                
+                # Call the debounce method in foundation to avoid flickering
+                self.foundation.trigger_lock_warning()
+                
+                # Return True to consume/block the event (prevent editing)
+                return True
+        
+        # Otherwise, let the event pass through normally
+        return super().eventFilter(obj, event)
+
+# --- UPDATED: MATERIAL INPUT POPUP ---
 class MaterialInputPopup(QDialog):
     def __init__(self, material_data_source, component_name, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Material Details")
-        self.setFixedWidth(550)
-        self.material_data_source = material_data_source  # Custom/Existing DB from data.py
+        self.setFixedWidth(750) 
+        self.material_data_source = material_data_source
         self.component_name = component_name 
         self.result_data = None
-        
-        # --- 1. MASTER DATABASE (Categorized by Component) ---
-        # This structure allows showing different options based on the component selected.
-        self.master_db = {
-            
-                "Excavation": {
-                    "All type(manual) (0 to 1.5m)": {
-                        "unit": "cum", "rate": "239", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1", 
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(manual) (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "262.9", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(manual) (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "286.8", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(manual) (4.5 to 6)": {
-                        "unit": "cum", "rate": "310.7", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(manual) (Above 6 m)": {
-                        "unit": "cum", "rate": "310.7", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(Mechanical) (0 to 1.5m)": {
-                        "unit": "cum", "rate": "90", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(Mechanical) (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "99", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(Mechanical) (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "108", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(Mechanical) (4.5 to 6)": {
-                        "unit": "cum", "rate": "117", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "All type(Mechanical) (Above 6 m)": {
-                        "unit": "cum", "rate": "117", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum (0 to 1.5m)": {
-                        "unit": "cum", "rate": "241", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "265.1", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "289.2", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum (4.5 to 6)": {
-                        "unit": "cum", "rate": "313.3", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum (Above 6 m)": {
-                        "unit": "cum", "rate": "313.3", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum and Boulders (0 to 1.5m)": {
-                        "unit": "cum", "rate": "286", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum and Boulders (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "314.6", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum and Boulders (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "343.2", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum and Boulders (4.5 to 6)": {
-                        "unit": "cum", "rate": "371.8", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Murrum and Boulders (Above 6 m)": {
-                        "unit": "cum", "rate": "371.8", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Soft Rock (0 to 1.5m)": {
-                        "unit": "cum", "rate": "557", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Soft Rock (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "612.7", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Soft Rock (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "668.4", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Soft Rock (4.5 to 6)": {
-                        "unit": "cum", "rate": "724.1", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Soft Rock (Above 6 m)": {
-                        "unit": "cum", "rate": "724.1", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Blasting) (0 to 1.5m)": {
-                        "unit": "cum", "rate": "1232", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Blasting) (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "1355.2", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Blasting) (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "1478.4", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Blasting) (4.5 to 6)": {
-                        "unit": "cum", "rate": "1601.6", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Blasting) (Above 6 m)": {
-                        "unit": "cum", "rate": "1601.6", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Controlled Blasting) (0 to 1.5m)": {
-                        "unit": "cum", "rate": "1328", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Controlled Blasting) (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "1460.8", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Controlled Blasting) (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "1593.6", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Controlled Blasting) (4.5 to 6)": {
-                        "unit": "cum", "rate": "1726.4", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard Rock (Controlled Blasting) (Above 6 m)": {
-                        "unit": "cum", "rate": "1726.4", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard rock (Chiselling and Wedging or Line drilling) (0 to 1.5m)": {
-                        "unit": "cum", "rate": "1932", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard rock (Chiselling and Wedging or Line drilling) (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "2125.2", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard rock (Chiselling and Wedging or Line drilling) (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "2318.4", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard rock (Chiselling and Wedging or Line drilling) (4.5 to 6)": {
-                        "unit": "cum", "rate": "2511.6", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Hard rock (Chiselling and Wedging or Line drilling) (Above 6 m)": {
-                        "unit": "cum", "rate": "2511.6", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Laterite Rock (0 to 1.5m)": {
-                        "unit": "cum", "rate": "1771", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Laterite Rock (1.5 to 3.0m)": {
-                        "unit": "cum", "rate": "1948.1", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Laterite Rock (3.0 to 4.5m)": {
-                        "unit": "cum", "rate": "2125.2", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Laterite Rock (4.5 to 6)": {
-                        "unit": "cum", "rate": "2302.3", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    },
-                    "Laterite Rock (Above 6 m)": {
-                        "unit": "cum", "rate": "2302.3", "source": "Maha PWD SOR",
-                        "carbon": "NA", "carbon_unit": "NA", "conv": "1",
-                        "c_source": "NA", "recyclable": False, "grades": ["Standard"]
-                    }
-                },
-                        
-            
-            "Pile": {
-                "Steel Rebar (Fe500)": {
-                    "unit": "MT", "rate": "88341", "source": "Maha PWD SOR",
-                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "1000",
-                    "c_source": "IFC", "recyclable": True, "grades": ["Fe500"]
-                },
-                "Concreting of bored pile (M30) (450mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "2914", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (450mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "3788.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (450mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4079.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (450mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "4662.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (450mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "5828", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (475mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3060", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (475mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "3978", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (475mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4284", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (475mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "4896", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (475mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6120", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (500mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3182", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (500mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4136.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (500mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4454.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (500mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5091.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (500mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6364", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (525mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3309", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (525mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4301.7", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (525mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4632.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (525mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5294.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (525mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6618", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (550mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3443", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (550mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4475.9", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (550mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4820.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (550mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5508.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (550mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6886", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (600mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "5027", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (600mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "6535.1", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (600mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "7037.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (600mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "8043.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (600mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "10054", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (625mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "5180", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (625mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "6734", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (625mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "7252", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (625mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "8288", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (625mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "10360", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (650mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "5340", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (650mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "6942", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (650mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "7476", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (650mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "8544", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (650mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "10680", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (750mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "7779", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (750mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "10112.7", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (750mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "10890.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (750mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "12446.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (750mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "15558", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (800mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "8197", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (800mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "10656.1", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (800mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "11475.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (800mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "13115.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (800mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "16394", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (825mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "8535", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (825mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "11095.5", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (825mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "11949", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (825mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "13656", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (825mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "17070", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (900mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "9277", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (900mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "12060.1", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (900mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "12987.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (900mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "14843.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (900mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "18554", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (975mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "10070", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (975mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "13091", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (975mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "14098", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (975mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "16112", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (975mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "20140", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1000mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "12352", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1000mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "16057.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1000mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "17292.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1000mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "19763.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1000mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "24704", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1050mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "13380", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1050mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "17394", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1050mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "18732", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1050mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "21408", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1050mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "26760", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1100mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "14462", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1100mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "18800.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1100mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "20246.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1100mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "23139.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1100mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "28924", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1200mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "17082", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1200mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "22206.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1200mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "23914.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1200mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "27331.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1200mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "34164", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1500mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "26701", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1500mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "34711.3", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1500mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "37381.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1500mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "42721.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M30) (1500mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "53402", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M30"]
-                },
-                "Concreting of bored pile (M35) (450mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3021", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (450mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "3927.3", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (450mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4229.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (450mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "4833.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (450mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6042", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (475mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3178", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (475mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4131.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (475mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4449.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (475mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5084.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (475mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6356", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (500mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3311", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (500mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4304.3", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (500mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4635.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (500mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5297.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (500mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6622", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (525mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3452", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (525mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4487.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (525mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "4832.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (525mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5523.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (525mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "6904", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (550mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "3606", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (550mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "4687.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (550mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "5048.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (550mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "5769.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (550mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "7212", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (600mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "5217", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (600mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "6782.1", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (600mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "7303.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (600mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "8347.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (600mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "10434", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (625mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "5387", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (625mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "7003.1", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (625mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "7541.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (625mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "8619.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (625mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "10774", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (650mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "5563", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (650mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "7231.9", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (650mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "7788.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (650mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "8900.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (650mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "11126", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (750mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "8075", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (750mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "10497.5", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (750mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "11305", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (750mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "12920", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (750mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "16150", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (800mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "8536", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (800mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "11096.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (800mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "11950.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (800mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "13657.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (800mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "17072", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (825mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "8806", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (825mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "11447.8", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (825mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "12328.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (825mm) (15 to 20m)": {
-                    "unit": "Rmt", "rate": "14089.6", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (825mm) (Above 20m)": {
-                    "unit": "Rmt", "rate": "17612", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (900mm) (0 to 5m)": {
-                    "unit": "Rmt", "rate": "9598", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (900mm) (5 to 10m)": {
-                    "unit": "Rmt", "rate": "12477.4", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                },
-                "Concreting of bored pile (M35) (900mm) (10 to 15m)": {
-                    "unit": "Rmt", "rate": "13437.2", "source": "Maha PWD SOR",
-                    "carbon": "0.11", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": False, "grades": ["M35"]
-                }
-            },
-
-            "Pile Cap": {
-                "Steel Rebar (Fe500)": {
-                    "unit": "MT", "rate": "88341", "source": "Maha PWD SOR",
-                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "1000",
-                    "c_source": "IFC", "recyclable": True, "grades": ["Fe500", "Fe500D", "Fe550"]
-                },
-                "Concreting of Pile cap M20": {
-                    "unit": "cum", "rate": "7050", "source": "Maha PWD SOR",
-                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": True, "grades": ["M20"]
-                },
-                "Concreting of Pile cap M25": {
-                    "unit": "cum", "rate": "7263", "source": "Maha PWD SOR",
-                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": True, "grades": ["M25"]
-                },
-                "Concreting of Pile cap M30": {
-                    "unit": "cum", "rate": "7381", "source": "Maha PWD SOR",
-                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": True, "grades": ["M30"]
-                },
-                "Concreting of Pile cap M35": {
-                    "unit": "cum", "rate": "7853", "source": "Maha PWD SOR",
-                    "carbon": "2.6", "carbon_unit": "kgCO₂e/kg", "conv": "2400",
-                    "c_source": "IFC", "recyclable": True, "grades": ["M35"]
-                }
-            },
-            
-            "PCC": {
-                 "Plain Cement Concrete M10": {
-                    "unit": "cum", "rate": "5500", "source": "Maha PWD SOR",
-                    "carbon": "2.4", "carbon_unit": "kgCO₂e/kg", "conv": "2300",
-                    "c_source": "IFC", "recyclable": True, "grades": ["M10"]
-                },
-                "Plain Cement Concrete M15": {
-                    "unit": "cum", "rate": "5800", "source": "Maha PWD SOR",
-                    "carbon": "2.5", "carbon_unit": "kgCO₂e/kg", "conv": "2300",
-                    "c_source": "IFC", "recyclable": True, "grades": ["M15"]
-                }
-            }
-        }
-
-        # --- 2. SELECT RELEVANT DATA ---
-        # Get data specific to the component. If not found, look for "General" or fallback to empty.
-        self.standard_db = self.master_db.get(self.component_name, {})
-        
-        # Merge keys: Component-Specific Standard DB + Existing Data.py keys
-        self.all_keys = sorted(list(set(list(self.material_data_source.keys()) + list(self.standard_db.keys()))))
         
         self.init_ui()
         
     def init_ui(self):
+        self.setStyleSheet("""
+            QDialog { background-color: #ffffff; }
+            QLabel { font-size: 12px; color: #333; font-family: 'Segoe UI', sans-serif; }
+            QLineEdit, QComboBox {
+                border: 1px solid #cccccc; border-radius: 8px; padding: 6px 10px;
+                background-color: #fcfcfc; font-size: 12px;
+            }
+            QLineEdit:focus, QComboBox:focus { border: 1px solid #007BFF; background-color: #ffffff; }
+            QListWidget { border: 1px solid #cccccc; border-radius: 8px; background-color: #ffffff; outline: none; }
+            QListWidget::item { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+            QListWidget::item:selected { background-color: #e6f3ff; color: #000; }
+            QListWidget::item:hover { background-color: #f5f5f5; }
+            QPushButton { border-radius: 6px; padding: 8px 16px; font-weight: bold; }
+        """)
+
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setSpacing(15)
         
-        # Header - Dynamic Component Name
-        header_text = QLabel(f"Region: India, Selected SOR: Bihar SOR 2025\nAdding in Foundation > {self.component_name} Component")
-        header_text.setStyleSheet("font-weight: bold; color: #333; margin-bottom: 10px;")
+        header_text = QLabel(f"Region: India, Selected SOR: Mumbai SOR 2025\nAdding in Foundation > {self.component_name} Component")
+        header_text.setStyleSheet("font-weight: bold; color: #2c3e50; font-size: 13px; margin-bottom: 5px;")
         layout.addWidget(header_text)
         
-        # Form Layout
         self.form_layout = QFormLayout()
-        self.form_layout.setSpacing(10)
+        self.form_layout.setSpacing(12)
         self.form_layout.setLabelAlignment(Qt.AlignLeft)
         
-        # -- Fields --
+        self.material_input = QLineEdit()
+        self.material_input.setPlaceholderText(f"Search {self.component_name} (e.g. 'manual 1.5')...")
+        self.material_input.textEdited.connect(self.update_search_results)
+        self.material_input.textChanged.connect(self.on_material_text_changed)
+        self.form_layout.addRow("Material", self.material_input)
         
-        # 1. Material Searchable Combo
-        self.material_combo = QComboBox()
-        self.material_combo.setEditable(True)
-        self.material_combo.setInsertPolicy(QComboBox.NoInsert) 
-        self.material_combo.setPlaceholderText("Search or type new custom material...")
-        self.material_combo.addItems(self.all_keys)
-        self.material_combo.setCurrentIndex(-1)
-        
-        # Setup Professional Completer
-        completer = self.material_combo.completer()
-        completer.setFilterMode(Qt.MatchContains)
-        completer.setCaseSensitivity(Qt.CaseInsensitive)
-        completer.setCompletionMode(QCompleter.PopupCompletion)
-        
-        self.material_combo.currentTextChanged.connect(self.on_material_changed)
-        self.form_layout.addRow("Material", self.material_combo)
+        self.suggestion_list = QListWidget(self)
+        self.suggestion_list.setWindowFlags(Qt.SubWindow)
+        self.suggestion_list.setFocusPolicy(Qt.NoFocus)
+        self.suggestion_list.setFixedHeight(150) 
+        self.suggestion_list.setUniformItemSizes(True)
+        self.suggestion_list.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.suggestion_list.hide() 
+        self.suggestion_list.itemClicked.connect(self.on_suggestion_clicked)
 
-        # Status Label
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("font-size: 11px; margin-left: 2px;")
         self.form_layout.addRow("", self.status_label)
 
-        # Grade
-        self.grade_combo = QComboBox()
-        self.grade_combo.setEditable(True) 
-        self.form_layout.addRow("Grade", self.grade_combo)
+        # Removed Grade Input from Popup
         
-        # Quantity
         self.quantity_edit = QLineEdit()
         self.quantity_edit.setValidator(QDoubleValidator(0.001, 9999999.99, 3))
         self.form_layout.addRow("Quantity (Unit_A) *", self.quantity_edit)
         
-        # Unit
+        # --- MODIFIED: Unit Input strictly as Dropdown ---
         self.unit_combo = QComboBox()
-        self.unit_combo.setEditable(True) 
+        self.unit_combo.setEditable(False) # Strict dropdown
+        self.unit_combo.setMinimumWidth(120) # Make wider
+        self.unit_combo.addItems(DROPDOWN_UNITS) # Populate from extracted list
         self.form_layout.addRow("Unit_A *", self.unit_combo)
         
-        # Rate
         self.rate_edit = QLineEdit()
         self.rate_edit.setValidator(QDoubleValidator(0.0, 9999999.99, 2))
         self.form_layout.addRow("Rupees/Unit_A *", self.rate_edit)
         
-        # Rate Source
         self.rate_source_edit = QLineEdit()
         self.form_layout.addRow("Rate source *", self.rate_source_edit)
         
-        # Carbon Emission
         self.carbon_edit = QLineEdit()
         self.carbon_edit.setPlaceholderText("Optional (or NA)")
         self.form_layout.addRow("Carbon emission (kgCO₂e/Unit_B)", self.carbon_edit)
         
-        # Carbon Units
         self.carbon_unit_edit = QLineEdit()
         self.form_layout.addRow("Carbon emission units", self.carbon_unit_edit)
         
-        # Conversion Factor
         self.conv_factor_edit = QLineEdit()
         self.conv_factor_edit.setValidator(QDoubleValidator(0.001, 9999999.99, 4))
         self.form_layout.addRow("Conversion factor (Unit_A → Unit_B) *", self.conv_factor_edit)
         
-        # Carbon Source
         self.carbon_source_edit = QLineEdit()
         self.form_layout.addRow("Carbon factor source", self.carbon_source_edit)
         
         layout.addLayout(self.form_layout)
         
-        # Inline Error Label
         self.error_label = QLabel("")
-        self.error_label.setStyleSheet("color: red; font-weight: bold; font-size: 11px;")
+        self.error_label.setStyleSheet("color: #dc3545; font-weight: 600; font-size: 11px;")
         self.error_label.setWordWrap(True)
         layout.addWidget(self.error_label)
 
-        # Checkboxes
         self.recyclable_check = QCheckBox("Recyclable")
         layout.addWidget(self.recyclable_check)
         
-        # Edit Checkbox
         self.edit_check = QCheckBox("Edit")
         self.edit_check.toggled.connect(self.on_edit_toggled)
         self.edit_check.setVisible(False) 
         layout.addWidget(self.edit_check)
         
-        # Save DB Checkbox
         self.save_db_check = QCheckBox("Save to database")
         self.save_db_check.setVisible(False)
         layout.addWidget(self.save_db_check)
         
-        # Buttons
+        layout.addSpacerItem(QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        
         self.add_btn = QPushButton("+ Add Material")
-        self.add_btn.setStyleSheet("background-color: #007BFF; color: white; padding: 6px; border-radius: 4px;")
+        self.add_btn.setStyleSheet("background-color: #007BFF; color: white; border: none;")
+        self.add_btn.setCursor(Qt.PointingHandCursor)
         self.add_btn.clicked.connect(self.validate_and_accept)
         
         self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setStyleSheet("background-color: #f0f0f0; color: #333; border: 1px solid #ccc;")
+        self.cancel_btn.setCursor(Qt.PointingHandCursor)
         self.cancel_btn.clicked.connect(self.reject)
         
         self.exit_btn = QPushButton("Exit")
-        self.exit_btn.setStyleSheet("background-color: #DC3545; color: white; padding: 6px; border-radius: 4px;")
+        self.exit_btn.setStyleSheet("background-color: #DC3545; color: white; border: none;")
+        self.exit_btn.setCursor(Qt.PointingHandCursor)
         self.exit_btn.clicked.connect(self.reject)
         
         btn_layout.addWidget(self.add_btn)
@@ -1169,76 +181,108 @@ class MaterialInputPopup(QDialog):
         
         layout.addLayout(btn_layout)
         
-        self.on_material_changed(self.material_combo.currentText())
+        self.on_material_text_changed(self.material_input.text())
 
-    def on_material_changed(self, text):
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.suggestion_list.isVisible():
+            self.adjust_list_position()
+
+    def adjust_list_position(self):
+        if not self.material_input: return
+        pos = self.material_input.mapTo(self, QPoint(0, self.material_input.height()))
+        available_width = self.width() - pos.x() - 25 
+        self.suggestion_list.move(pos)
+        self.suggestion_list.setFixedWidth(available_width)
+        self.suggestion_list.raise_()
+
+    def update_search_results(self, text):
+        if not searcher: return
+        backend_results = searcher.performSearch([self.component_name.lower()], text)
+        backend_items = [item['name'] for item in backend_results]
+
+        data_py_items = []
+        if self.material_data_source:
+            norm_text = text.lower().strip()
+            tokens = norm_text.split()
+            for key in self.material_data_source.keys():
+                key_lower = key.lower()
+                if all(t in key_lower for t in tokens):
+                    data_py_items.append(key)
+
+        all_items = sorted(list(set(backend_items + data_py_items)))
+        self.suggestion_list.clear()
+        
+        if not text.strip():
+            self.suggestion_list.hide()
+            return
+
+        if all_items:
+            self.suggestion_list.addItems(all_items)
+            self.adjust_list_position() 
+            self.suggestion_list.show()
+        else:
+            self.suggestion_list.hide()
+
+    def on_suggestion_clicked(self, item):
+        self.material_input.setText(item.text())
+        self.suggestion_list.hide()
+
+    def on_material_text_changed(self, text):
         self.error_label.setText("") 
-        
-        std_data = None
-        exact_key = ""
-        
-        # 1. Check Component-Specific Standard DB
-        for key, val in self.standard_db.items():
-            if key.lower() == text.lower():
-                std_data = val
-                exact_key = key
-                break
-        
-        # 2. Check Data.py
+        backend_data = None
         data_py_data = None
-        if not std_data:
+        
+        if searcher:
+            backend_data = searcher.getDetailByName(text)
+
+        if not backend_data:
             for key, val in self.material_data_source.items():
                 if key.lower() == text.lower():
                     data_py_data = val
-                    exact_key = key
                     break
         
-        if std_data:
-            # Found in Standard DB (Fully Defined)
-            self.status_label.setText(f"✅ Found standard material: {exact_key}")
+        if backend_data:
+            self.status_label.setText(f"✅ Found standard material: {backend_data.get('name')}")
             self.status_label.setStyleSheet("color: green; font-size: 11px; margin-left: 2px;")
-            
             self.edit_check.setVisible(True)
             self.edit_check.setChecked(False)
             self.save_db_check.setVisible(False)
             
-            self.grade_combo.blockSignals(True)
-            self.grade_combo.clear()
-            self.grade_combo.addItems(std_data.get("grades", []))
-            self.grade_combo.blockSignals(False)
+            # Select appropriate unit from dropdown
+            unit = backend_data.get("unit", "")
+            index = self.unit_combo.findText(unit)
+            if index != -1:
+                self.unit_combo.setCurrentIndex(index)
+            else:
+                # If not in extracted list, allow setting it (or add it temporarily)
+                self.unit_combo.addItem(unit)
+                self.unit_combo.setCurrentText(unit)
             
-            self.unit_combo.clear()
-            self.unit_combo.addItem(std_data.get("unit", ""))
+            self.rate_edit.setText(str(backend_data.get("rate", "")))
+            self.rate_source_edit.setText(backend_data.get("rate_src", ""))
+            self.carbon_edit.setText(str(backend_data.get("carbon_emission", "")))
+            self.carbon_unit_edit.setText(backend_data.get("carbon_emission_units", ""))
+            self.conv_factor_edit.setText(str(backend_data.get("conversion_factor", "")))
+            self.carbon_source_edit.setText(backend_data.get("carbon_emission_src", ""))
             
-            self.rate_edit.setText(str(std_data.get("rate", "")))
-            self.rate_source_edit.setText(std_data.get("source", ""))
-            self.carbon_edit.setText(str(std_data.get("carbon", "")))
-            self.carbon_unit_edit.setText(std_data.get("carbon_unit", ""))
-            self.conv_factor_edit.setText(str(std_data.get("conv", "")))
-            self.carbon_source_edit.setText(std_data.get("c_source", ""))
-            self.recyclable_check.setChecked(std_data.get("recyclable", False))
-            
+            is_recyclable = str(backend_data.get("recycleable", "")).lower() == "recyclable"
+            self.recyclable_check.setChecked(is_recyclable)
             self.set_fields_readonly(True)
             
         elif data_py_data:
-            # Found in Data.py (Partially Defined)
-            self.status_label.setText(f"✅ Found standard material: {exact_key}")
+            self.status_label.setText(f"✅ Found data material: {text}")
             self.status_label.setStyleSheet("color: green; font-size: 11px; margin-left: 2px;")
-            
             self.edit_check.setVisible(True)
             self.edit_check.setChecked(False)
             self.save_db_check.setVisible(False)
             
-            grades = data_py_data.get(KEY_GRADE, [])
             units = data_py_data.get(KEY_UNITS, [])
-            
-            self.grade_combo.blockSignals(True)
-            self.grade_combo.clear()
-            self.grade_combo.addItems(grades)
-            self.grade_combo.blockSignals(False)
-            
-            self.unit_combo.clear()
-            self.unit_combo.addItems(units)
+            if units:
+                # Try to select the first unit from data_py in the combo
+                index = self.unit_combo.findText(units[0])
+                if index != -1:
+                    self.unit_combo.setCurrentIndex(index)
             
             self.set_fields_readonly(True)
             
@@ -1251,19 +295,10 @@ class MaterialInputPopup(QDialog):
             self.recyclable_check.setChecked(False)
             
         else:
-            # Custom Material
-            if text.strip():
-                self.status_label.setText("✏️ Creating new custom material")
-                self.status_label.setStyleSheet("color: #007BFF; font-size: 11px; margin-left: 2px;")
-            else:
-                self.status_label.setText("")
-
+            self.status_label.setText("") 
             self.edit_check.setVisible(False)
             self.save_db_check.setVisible(True)
             self.set_fields_readonly(False)
-            
-            if self.grade_combo.count() == 0:
-                self.grade_combo.setEditable(True)
 
     def on_edit_toggled(self, checked):
         if checked:
@@ -1279,7 +314,7 @@ class MaterialInputPopup(QDialog):
 
     def set_fields_readonly(self, readonly):
         self.unit_combo.setEnabled(not readonly)
-        self.grade_combo.setEnabled(not readonly)
+        # Removed Grade enabled logic
         self.rate_edit.setReadOnly(readonly)
         self.rate_source_edit.setReadOnly(readonly)
         self.carbon_edit.setReadOnly(readonly)
@@ -1288,77 +323,71 @@ class MaterialInputPopup(QDialog):
         self.carbon_source_edit.setReadOnly(readonly)
         self.recyclable_check.setEnabled(not readonly)
         
-        style = "background-color: #E0E0E0;" if readonly else "background-color: #FFFFFF;"
+        base_style = "border: 1px solid #ccc; border-radius: 8px; padding: 6px 10px;"
+        style = base_style + ("background-color: #E0E0E0;" if readonly else "background-color: #fcfcfc;")
+            
         for widget in [self.rate_edit, self.rate_source_edit, self.carbon_edit, 
                        self.carbon_unit_edit, self.conv_factor_edit, self.carbon_source_edit]:
             widget.setStyleSheet(style)
         self.unit_combo.setStyleSheet(style)
-        self.grade_combo.setStyleSheet(style)
 
     def validate_and_accept(self):
         self.error_label.setText("")
-        
-        name = self.material_combo.currentText().strip()
+        name = self.material_input.text().strip()
         if not name:
             self.error_label.setText("Error: Material name is required.")
             return
 
         errors = []
-        
-        # Quantity
         try:
             qty = float(self.quantity_edit.text())
             if qty <= 0: errors.append("Quantity must be > 0.")
         except ValueError:
             errors.append("Quantity must be a valid number.")
 
-        # Unit
         if not self.unit_combo.currentText().strip():
             errors.append("Unit cannot be empty.")
 
-        # Price
         try:
             price = float(self.rate_edit.text())
             if price < 0: errors.append("Price must be a valid number.")
         except ValueError:
             errors.append("Price must be a valid number.")
 
-        # Rate Source
         if not self.rate_source_edit.text().strip():
             errors.append("Rate Source is required.")
+        
+        conv_text = self.conv_factor_edit.text().strip()
+        if conv_text.lower() not in ["na", "not_available", "not available"]:
+            try:
+                conv = float(conv_text)
+                if conv <= 0: errors.append("Conversion Factor must be > 0.")
+            except ValueError:
+                errors.append("Conversion Factor must be a valid number.")
 
-        # Conversion Factor
-        try:
-            conv = float(self.conv_factor_edit.text())
-            if conv <= 0: errors.append("Conversion Factor must be > 0.")
-        except ValueError:
-            errors.append("Conversion Factor must be a valid number.")
-
-        # Carbon Emission
         c_text = self.carbon_edit.text().strip()
-        if c_text and c_text.lower() != "na":
+        if c_text and c_text.lower() not in ["na", "not_available", "not available"]:
             try:
                 c_val = float(c_text)
                 if c_val < 0: errors.append("Carbon Emission must be ≥ 0.")
             except ValueError:
                 errors.append("Carbon Emission must be a number or 'NA'.")
 
-        # Duplicate Name Check
         if self.save_db_check.isChecked():
             existing_keys = [k.lower() for k in self.material_data_source.keys()]
-            std_keys = [k.lower() for k in self.standard_db.keys()]
-            if name.lower() in existing_keys or name.lower() in std_keys:
+            backend_exists = False
+            if searcher and searcher.getDetailByName(name):
+                backend_exists = True
+            if name.lower() in existing_keys or backend_exists:
                 errors.append(f"Material '{name}' already exists in the database.")
 
         if errors:
             self.error_label.setText("\n".join(errors))
             return
 
-        # Prepare Result
         is_custom = True
-        for key in self.standard_db.keys():
-            if key.lower() == name.lower():
-                is_custom = False; break
+        if searcher and searcher.getDetailByName(name):
+            is_custom = False
         if is_custom:
             for key in self.material_data_source.keys():
                 if key.lower() == name.lower():
@@ -1366,7 +395,7 @@ class MaterialInputPopup(QDialog):
 
         self.result_data = {
             KEY_TYPE: name,
-            KEY_GRADE: self.grade_combo.currentText(),
+            KEY_GRADE: "Standard", # Defaulting Grade to Standard as UI is removed
             KEY_QUANTITY: self.quantity_edit.text(),
             KEY_UNIT_M3: self.unit_combo.currentText(),
             KEY_RATE: self.rate_edit.text(),
@@ -1386,10 +415,12 @@ class MaterialInputPopup(QDialog):
 
 # --- COMPONENT WIDGET ---
 class ComponentWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.parent_widget = parent
+    def __init__(self, foundation_parent, event_filter):
+        super().__init__(foundation_parent)
+        self.parent_widget = foundation_parent
+        self.lock_event_filter = event_filter 
         self._initializing = True
+        self.is_locked = False 
         self.data = construction_materials.get(KEY_FOUNDATION)
         self.material_rows = []
         self.current_material_row_idx = 1
@@ -1409,6 +440,7 @@ class ComponentWidget(QWidget):
 
         self.component_combobox = QComboBox()
         self.component_combobox.currentTextChanged.connect(self.update_comp_material)
+        self.component_combobox.installEventFilter(self.lock_event_filter) 
         
         comp_items = list(self.data.keys())
         if "PCC" not in comp_items:
@@ -1421,6 +453,7 @@ class ComponentWidget(QWidget):
 
         self.remove_component_button = QPushButton("x")
         self.remove_component_button.setFixedSize(24, 24)
+        self.remove_component_button.installEventFilter(self.lock_event_filter) 
         self.remove_component_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFCCCC;
@@ -1431,12 +464,12 @@ class ComponentWidget(QWidget):
                 padding: 0px;
                 color: #CC0000;
             }
-            QPushButton:hover {
-                background-color: #FF9999;
-                color: white;
-            }
-            QPushButton:pressed {
-                background-color: #FF6666;
+            QPushButton:hover { background-color: #FF9999; color: white; }
+            QPushButton:pressed { background-color: #FF6666; }
+            QPushButton[locked_state="true"] {
+                background-color: #F8F8F8;
+                border: 1px solid #E0E0E0;
+                color: #CCCCCC;
             }
         """)
         component_header_layout.addWidget(self.remove_component_button)
@@ -1448,12 +481,32 @@ class ComponentWidget(QWidget):
         self.material_grid_layout.setHorizontalSpacing(10)
         self.material_grid_layout.setVerticalSpacing(5)
 
-        headers = ["Type of Material", "Grade", "Quantity", "Unit", "Rate", "Rate Data Source"]
+        # --- UPDATED: Set Column Stretch to widen 'Type of Material' columns ---
+        # Adjusted ratio: Type (Col 0,1) gets weight 2 each (total 4).
+        # Others (Col 2-5) get weight 3 each.
+        self.material_grid_layout.setColumnStretch(0, 2) 
+        self.material_grid_layout.setColumnStretch(1, 2) 
+        self.material_grid_layout.setColumnStretch(2, 3) # Quantity
+        self.material_grid_layout.setColumnStretch(3, 3) # Unit
+        self.material_grid_layout.setColumnStretch(4, 3) # Rate
+        self.material_grid_layout.setColumnStretch(5, 3) # Source
+        self.material_grid_layout.setColumnStretch(6, 0) # Button (Fixed)
+
+        # Removed Grade from Headers, Type spans 2 columns
+        headers = ["Type of Material", "Quantity", "Unit", "Rate", "Rate Data Source"]
         for col, header_text in enumerate(headers):
             label = QLabel(header_text)
             label.setAlignment(Qt.AlignCenter)
             label.setObjectName("MaterialGridLabel")
-            self.material_grid_layout.addWidget(label, 0, col)
+            
+            if col == 0:
+                # Type of Material spans 2 columns (0 and 1)
+                self.material_grid_layout.addWidget(label, 0, 0, 1, 2)
+            else:
+                # Adjust column index: list index 1 (Quantity) goes to grid col 2
+                # list index 2 (Unit) goes to grid col 3, etc.
+                grid_col = col + 1 
+                self.material_grid_layout.addWidget(label, 0, grid_col)
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
 
@@ -1467,6 +520,7 @@ class ComponentWidget(QWidget):
 
         self.add_material_button = QPushButton("+ Add Material")
         self.add_material_button.setObjectName("add_material_button")
+        self.add_material_button.installEventFilter(self.lock_event_filter) 
         self.add_material_button.clicked.connect(self.open_add_material_popup)
         buttons_layout.addWidget(self.add_material_button)
         
@@ -1475,19 +529,29 @@ class ComponentWidget(QWidget):
         self.component_first_scroll_content_layout.addLayout(buttons_layout)
         
     def set_locked(self, locked):
-        self.component_combobox.setEnabled(not locked)
-        self.add_material_button.setEnabled(not locked)
-        self.remove_component_button.setEnabled(not locked)
+        self.is_locked = locked
         
+        # Helper to apply style updates for locking
+        def set_widget_locked(widget):
+            widget.setProperty("locked_state", str(locked).lower())
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+
+        # 1. Main Component Widgets
+        set_widget_locked(self.component_combobox)
+        set_widget_locked(self.add_material_button)
+        set_widget_locked(self.remove_component_button)
+        
+        # 2. Row Widgets - Force Update on Every Input Widget
         for row in self.material_rows:
-            row[KEY_TYPE].setEnabled(not locked)
-            row[KEY_GRADE].setEnabled(not locked)
-            row[KEY_QUANTITY].setEnabled(not locked)
-            row[KEY_UNIT_M3].setEnabled(not locked)
-            row[KEY_RATE].setEnabled(not locked)
-            row[KEY_RATE_DATA_SOURCE].setEnabled(not locked)
-            row['remove_button'].setEnabled(not locked)
-    
+            set_widget_locked(row[KEY_TYPE])
+            # Grade is removed, skipping
+            set_widget_locked(row[KEY_QUANTITY])
+            set_widget_locked(row[KEY_UNIT_M3])
+            set_widget_locked(row[KEY_RATE])
+            set_widget_locked(row[KEY_RATE_DATA_SOURCE])
+            set_widget_locked(row['remove_button'])
+   
     def collect_data(self):
         rows_data = []
         for row in self.material_rows:
@@ -1499,11 +563,8 @@ class ComponentWidget(QWidget):
             else:
                 material_type = widget_type.text()
 
-            widget_grade = row[KEY_GRADE]
-            if isinstance(widget_grade, QComboBox):
-                material_grade = widget_grade.currentText()
-            else:
-                material_grade = widget_grade.text()
+            # Grade is removed from UI, defaulting to "Standard"
+            material_grade = "Standard"
 
             widget_unit = row[KEY_UNIT_M3]
             if isinstance(widget_unit, QComboBox):
@@ -1538,8 +599,8 @@ class ComponentWidget(QWidget):
         if self.parent_widget and hasattr(self.parent_widget, "mark_state_changed"):
             self.parent_widget.mark_state_changed()
 
-    def _on_type_material_changed(self, text, grade_widget, unit_widget):
-        self.update_comp_grades(text, grade_widget)
+    def _on_type_material_changed(self, text, unit_widget):
+        # self.update_comp_grades(text, grade_widget) # Removed as grade is gone
         self.update_comp_units(text, unit_widget)
         self._on_value_changed()
 
@@ -1548,38 +609,42 @@ class ComponentWidget(QWidget):
         materials = comp_data.keys()
 
         for i in range(len(self.material_rows)):
-            material_combo = self.material_rows[i][KEY_TYPE]
-            
-            if not isinstance(material_combo, QComboBox):
-                continue
-
-            grade_combo = self.material_rows[i][KEY_GRADE]
+            material_widget = self.material_rows[i][KEY_TYPE]
+            # Grade combo removed
             unit_combo = self.material_rows[i][KEY_UNIT_M3]
-            material_combo.clear()
-            material_combo.addItems(materials)
-            current_text = material_combo.currentText()
-            if current_text:
-                self.update_comp_grades(current_text, grade_combo)
-                self.update_comp_units(current_text, unit_combo)
+            
+            if isinstance(material_widget, QComboBox):
+                material_widget.clear()
+                material_widget.addItems(materials)
+                current_text = material_widget.currentText()
+                if current_text:
+                    # self.update_comp_grades(current_text, grade_combo) # Removed
+                    self.update_comp_units(current_text, unit_combo)
+            
+            elif isinstance(material_widget, QLineEdit):
+                current_text = material_widget.text()
+                if current_text:
+                    # self.update_comp_grades(current_text, grade_combo) # Removed
+                    self.update_comp_units(current_text, unit_combo)
+
         self._on_value_changed()
-    
-    def update_comp_grades(self, selected_material, widget):
-        selected_component = self.component_combobox.currentText()
-        grades = self.data.get(selected_component,{}).get(selected_material,{}).get(KEY_GRADE,[])
-        widget.clear()
-        widget.addItems(grades)
-    
+   
+    # def update_comp_grades(self, selected_material, widget):
+    #     selected_component = self.component_combobox.currentText()
+    #     grades = self.data.get(selected_component,{}).get(selected_material,{}).get(KEY_GRADE,[])
+    #     widget.clear()
+    #     widget.addItems(grades)
+   
     def update_comp_units(self, selected_material, widget):
         selected_component = self.component_combobox.currentText()
-        units = self.data.get(selected_component,{}).get(selected_material,{}).get(KEY_UNITS,[])
+        # Use extracted units list
+        units = DROPDOWN_UNITS
         widget.clear()
         widget.addItems(units)
 
     def open_add_material_popup(self):
         selected_component = self.component_combobox.currentText()
         materials_data = self.data.get(selected_component, {})
-        
-        # --- FIXED: PASS COMPONENT NAME TO POPUP ---
         popup = MaterialInputPopup(materials_data, selected_component, self)
         if popup.exec() == QDialog.Accepted:
             data = popup.get_data()
@@ -1596,7 +661,7 @@ class ComponentWidget(QWidget):
         validator.setRange(0.0, 9999999.999, 3)
         validator.setBottom(0.0)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
-    
+   
         row_widgets = {}
         row_idx = self.current_material_row_idx
         
@@ -1604,31 +669,45 @@ class ComponentWidget(QWidget):
         type_material_input.setPlaceholderText("Enter custom material")
         type_material_input.setObjectName("MaterialGridInput")
         type_material_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.material_grid_layout.addWidget(type_material_input, row_idx, 0)
+        type_material_input.installEventFilter(self.lock_event_filter)
+        
+        # --- MODIFIED: Make Type Read Only in Grid ---
+        type_material_input.setReadOnly(True)
+        # specific request: should not be grey
+        type_material_input.setStyleSheet("background-color: #FFFFFF; color: #000000;")
+        
+        # SPAN 2 COLUMNS (0 and 1)
+        self.material_grid_layout.addWidget(type_material_input, row_idx, 0, 1, 2)
         row_widgets[KEY_TYPE] = type_material_input
         type_material_input.textChanged.connect(self._on_value_changed)
 
-        grade_input = QComboBox() 
-        grade_input.setEditable(True)
-        grade_input.setObjectName("MaterialGridInput")
-        grade_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.material_grid_layout.addWidget(grade_input, row_idx, 1)
-        row_widgets[KEY_GRADE] = grade_input
-        grade_input.currentTextChanged.connect(self._on_value_changed)
+        # Removed Grade Input
+        # Columns shift: 
+        # Type: 0 (span 2 -> covers 0,1)
+        # Quantity: 2
+        # Unit: 3
+        # Rate: 4
+        # Source: 5
+        # Remove: 6
 
         quantity_edit = QLineEdit()
         quantity_edit.setValidator(validator)
         quantity_edit.setPlaceholderText("0")
         quantity_edit.setObjectName("MaterialGridInput")
         quantity_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        quantity_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(quantity_edit, row_idx, 2)
         row_widgets[KEY_QUANTITY] = quantity_edit
         quantity_edit.textChanged.connect(self._on_value_changed)
 
         unit_combo_m3 = QComboBox()
-        unit_combo_m3.setEditable(True)
+        # --- MODIFIED: Strict Dropdown for Unit using extracted list ---
+        unit_combo_m3.setEditable(False)
+        unit_combo_m3.setMinimumWidth(120) # Make wider
+        unit_combo_m3.addItems(DROPDOWN_UNITS)
         unit_combo_m3.setObjectName("MaterialGridInput")
         unit_combo_m3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        unit_combo_m3.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(unit_combo_m3, row_idx, 3)
         row_widgets[KEY_UNIT_M3] = unit_combo_m3
         unit_combo_m3.currentTextChanged.connect(self._on_value_changed)
@@ -1638,6 +717,7 @@ class ComponentWidget(QWidget):
         rate_edit.setPlaceholderText("0.00")
         rate_edit.setObjectName("MaterialGridInput")
         rate_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(rate_edit, row_idx, 4)
         row_widgets[KEY_RATE] = rate_edit
         rate_edit.textChanged.connect(self._on_value_changed)
@@ -1645,12 +725,14 @@ class ComponentWidget(QWidget):
         rate_data_source_edit = QLineEdit()
         rate_data_source_edit.setObjectName("MaterialGridInput")
         rate_data_source_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_data_source_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(rate_data_source_edit, row_idx, 5)
         row_widgets[KEY_RATE_DATA_SOURCE] = rate_data_source_edit
         rate_data_source_edit.textChanged.connect(self._on_value_changed)
 
         remove_button = QPushButton("x")
         remove_button.setFixedSize(24, 24)
+        remove_button.installEventFilter(self.lock_event_filter) 
         remove_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFCCCC;
@@ -1661,12 +743,12 @@ class ComponentWidget(QWidget):
                 padding: 0px;
                 color: #CC0000;
             }
-            QPushButton:hover {
-                background-color: #FF9999;
-                color: white;
-            }
-            QPushButton:pressed {
-                background-color: #FF6666;
+            QPushButton:hover { background-color: #FF9999; color: white; }
+            QPushButton:pressed { background-color: #FF6666; }
+            QPushButton[locked_state="true"] {
+                background-color: #F8F8F8;
+                border: 1px solid #E0E0E0;
+                color: #CCCCCC;
             }
         """)
         remove_button.clicked.connect(lambda: self.remove_material_row_by_widgets(row_widgets))
@@ -1677,11 +759,20 @@ class ComponentWidget(QWidget):
 
         if data:
             type_material_input.setText(data.get(KEY_TYPE, ""))
-            grade_input.addItem(data.get(KEY_GRADE, ""))
+            
+            # Removed Grade update logic
+            self.update_comp_units(type_material_input.text(), unit_combo_m3)
+            
+            target_unit = data.get(KEY_UNIT_M3, "")
+            if target_unit:
+                if unit_combo_m3.findText(target_unit) == -1:
+                    unit_combo_m3.addItem(target_unit)
+                unit_combo_m3.setCurrentText(target_unit)
+
             quantity_edit.setText(data.get(KEY_QUANTITY, ""))
-            unit_combo_m3.addItem(data.get(KEY_UNIT_M3, ""))
             rate_edit.setText(data.get(KEY_RATE, ""))
             rate_data_source_edit.setText(data.get(KEY_RATE_DATA_SOURCE, ""))
+            
             row_widgets["carbon_emission"] = data.get("carbon_emission")
             row_widgets["carbon_unit"] = data.get("carbon_unit")
             row_widgets["conversion_factor"] = data.get("conversion_factor")
@@ -1701,35 +792,45 @@ class ComponentWidget(QWidget):
         validator.setRange(0.0, 9999999.999, 3)
         validator.setBottom(0.0)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
-    
+   
         row_widgets = {}
         row_idx = self.current_material_row_idx
 
-        type_material_combo = QComboBox()
-        type_material_combo.setObjectName("MaterialGridInput")
-        type_material_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.material_grid_layout.addWidget(type_material_combo, row_idx, 0)
-        row_widgets[KEY_TYPE] = type_material_combo
+        type_material_input = QLineEdit()
+        type_material_input.setObjectName("MaterialGridInput")
+        type_material_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        type_material_input.installEventFilter(self.lock_event_filter)
+        
+        # --- MODIFIED: Make Type Read Only in Grid ---
+        type_material_input.setReadOnly(True)
+        # specific request: should not be grey
+        type_material_input.setStyleSheet("background-color: #FFFFFF; color: #000000;")
+        
+        # SPAN 2 COLUMNS (0 and 1)
+        self.material_grid_layout.addWidget(type_material_input, row_idx, 0, 1, 2)
+        row_widgets[KEY_TYPE] = type_material_input
+        type_material_input.textChanged.connect(self._on_value_changed)
 
-        grade_combo = QComboBox()
-        grade_combo.setObjectName("MaterialGridInput")
-        grade_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.material_grid_layout.addWidget(grade_combo, row_idx, 1)
-        row_widgets[KEY_GRADE] = grade_combo
-        grade_combo.currentTextChanged.connect(self._on_value_changed)
+        # Removed Grade Combo
 
         quantity_edit = QLineEdit()
         quantity_edit.setValidator(validator)
         quantity_edit.setPlaceholderText("0")
         quantity_edit.setObjectName("MaterialGridInput")
         quantity_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        quantity_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(quantity_edit, row_idx, 2)
         row_widgets[KEY_QUANTITY] = quantity_edit
         quantity_edit.textChanged.connect(self._on_value_changed)
 
         unit_combo_m3 = QComboBox()
+        # --- MODIFIED: Strict Dropdown for Unit using extracted list ---
+        unit_combo_m3.setEditable(False)
+        unit_combo_m3.setMinimumWidth(120) # Make wider
+        unit_combo_m3.addItems(DROPDOWN_UNITS)
         unit_combo_m3.setObjectName("MaterialGridInput")
         unit_combo_m3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        unit_combo_m3.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(unit_combo_m3, row_idx, 3)
         row_widgets[KEY_UNIT_M3] = unit_combo_m3
         unit_combo_m3.currentTextChanged.connect(self._on_value_changed)
@@ -1739,6 +840,7 @@ class ComponentWidget(QWidget):
         rate_edit.setPlaceholderText("0.00")
         rate_edit.setObjectName("MaterialGridInput")
         rate_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(rate_edit, row_idx, 4)
         row_widgets[KEY_RATE] = rate_edit
         rate_edit.textChanged.connect(self._on_value_changed)
@@ -1746,12 +848,14 @@ class ComponentWidget(QWidget):
         rate_data_source_edit = QLineEdit()
         rate_data_source_edit.setObjectName("MaterialGridInput")
         rate_data_source_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        rate_data_source_edit.installEventFilter(self.lock_event_filter) 
         self.material_grid_layout.addWidget(rate_data_source_edit, row_idx, 5)
         row_widgets[KEY_RATE_DATA_SOURCE] = rate_data_source_edit
         rate_data_source_edit.textChanged.connect(self._on_value_changed)
 
         remove_button = QPushButton("x")
         remove_button.setFixedSize(24, 24)
+        remove_button.installEventFilter(self.lock_event_filter) 
         remove_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFCCCC;
@@ -1762,12 +866,12 @@ class ComponentWidget(QWidget):
                 padding: 0px;
                 color: #CC0000;
             }
-            QPushButton:hover {
-                background-color: #FF9999;
-                color: white;
-            }
-            QPushButton:pressed {
-                background-color: #FF6666;
+            QPushButton:hover { background-color: #FF9999; color: white; }
+            QPushButton:pressed { background-color: #FF6666; }
+            QPushButton[locked_state="true"] {
+                background-color: #F8F8F8;
+                border: 1px solid #E0E0E0;
+                color: #CCCCCC;
             }
         """)
         remove_button.clicked.connect(lambda: self.remove_material_row_by_widgets(row_widgets))
@@ -1775,38 +879,29 @@ class ComponentWidget(QWidget):
         self.material_grid_layout.addWidget(remove_button, row_idx, 6, alignment=Qt.AlignCenter)
         
         row_widgets['remove_button'] = remove_button
-
-        type_material_combo.currentTextChanged.connect(
-            lambda text, grade_widget=grade_combo, unit_widget=unit_combo_m3: self._on_type_material_changed(text, grade_widget, unit_widget)
+        
+        type_material_input.textChanged.connect(
+            lambda text, unit_widget=unit_combo_m3: self._on_type_material_changed(text, unit_widget)
         )
 
         self.material_rows.append(row_widgets)
         self.current_material_row_idx += 1
-
-        selected_component = self.component_combobox.currentText()
-        materials = list(self.data.get(selected_component, {}).keys())
-        type_material_combo.addItems(materials)
         
         if data:
-            type_material_combo.blockSignals(True)
-            index = type_material_combo.findText(data.get(KEY_TYPE, ""))
-            if index != -1:
-                type_material_combo.setCurrentIndex(index)
-            type_material_combo.blockSignals(False)
+            type_material_input.setText(data.get(KEY_TYPE, ""))
             
-            self.update_comp_grades(type_material_combo.currentText(), grade_combo)
-            self.update_comp_units(type_material_combo.currentText(), unit_combo_m3)
+            # Removed Grade update logic
+            self.update_comp_units(type_material_input.text(), unit_combo_m3)
             
-            g_index = grade_combo.findText(data.get(KEY_GRADE, ""))
-            if g_index != -1:
-                grade_combo.setCurrentIndex(g_index)
+            # Removed Grade target setting
+            
+            target_unit = data.get(KEY_UNIT_M3, "")
+            if target_unit:
+                if unit_combo_m3.findText(target_unit) == -1:
+                    unit_combo_m3.addItem(target_unit)
+                unit_combo_m3.setCurrentText(target_unit)
             
             quantity_edit.setText(data.get(KEY_QUANTITY, ""))
-            
-            u_index = unit_combo_m3.findText(data.get(KEY_UNIT_M3, ""))
-            if u_index != -1:
-                unit_combo_m3.setCurrentIndex(u_index)
-                
             rate_edit.setText(data.get(KEY_RATE, ""))
             rate_data_source_edit.setText(data.get(KEY_RATE_DATA_SOURCE, ""))
             
@@ -1815,10 +910,7 @@ class ComponentWidget(QWidget):
             row_widgets["conversion_factor"] = data.get("conversion_factor")
             row_widgets["carbon_source"] = data.get("carbon_source")
             row_widgets["recyclable"] = data.get("recyclable")
-        elif materials:
-            first_material = materials[0]
-            self.update_comp_grades(first_material, grade_combo)
-            self.update_comp_units(first_material, unit_combo_m3)
+            row_widgets["save_to_db"] = data.get("save_to_db")
 
         self.updateGeometry()
         self.adjustSize()
@@ -1865,6 +957,9 @@ class ComponentWidget(QWidget):
                         self.material_grid_layout.removeWidget(widget)
                         if c_idx == 6:
                             self.material_grid_layout.addWidget(widget, r_idx, c_idx, alignment=Qt.AlignCenter)
+                        elif c_idx == 0:
+                             # Re-add Type at col 0 with span 2
+                             self.material_grid_layout.addWidget(widget, r_idx, 0, 1, 2)
                         else:
                             self.material_grid_layout.addWidget(widget, r_idx, c_idx)
                     elif item.layout():
@@ -1893,6 +988,12 @@ class Foundation(QWidget):
         self.is_first_visit = True
         self.is_locked = False
         
+        # --- NEW: Cooldown state for the warning tooltip ---
+        self.warning_cooldown = False 
+        
+        # --- Create Single Instance of Event Filter ---
+        self.lock_filter = LockEventFilter(self)
+
         self.setStyleSheet("""
             #central_panel_widget {
                 background-color: #F8F8F8;
@@ -2117,6 +1218,20 @@ class Foundation(QWidget):
                 color: #AAAAAA;
                 border-color: #D0D0D0;
             }
+            
+            /* --- UPDATED: Locked State Styling for visual feedback --- */
+            QPushButton#add_material_button[locked_state="true"], 
+            QPushButton#add_component_button[locked_state="true"] {
+                background-color: #F0F0F0;
+                color: #AAAAAA;
+                border-color: #D0D0D0;
+            }
+            /* Use ID selector to override other styles with higher specificity */
+            #MaterialGridInput[locked_state="true"] {
+                background-color: #E0E0E0;
+                color: #888888;
+                border: 1px solid #D0D0D0;
+            }
         """)
         
         left_panel_vlayout = QVBoxLayout(self)
@@ -2128,11 +1243,13 @@ class Foundation(QWidget):
         lock_hlayout.setSpacing(0)
         lock_hlayout.addStretch()
 
-        self.lock_button = QPushButton("🔓")
+        self.lock_button = QPushButton("🔓") 
         self.lock_button.setObjectName("lock_button")
-        self.lock_button.setFixedSize(24, 24)
+        self.lock_button.setFixedSize(30, 30) 
+        self.lock_button.setCursor(Qt.PointingHandCursor)
         self.lock_button.setProperty("locked", "false")
         self.lock_button.clicked.connect(self.toggle_lock)
+        self.lock_button.setToolTip("Click to Lock Editing") 
         lock_hlayout.addWidget(self.lock_button)
 
         self.scroll_area = QScrollArea()
@@ -2151,6 +1268,7 @@ class Foundation(QWidget):
 
         self.add_component_button = QPushButton("+ Add Component")
         self.add_component_button.setObjectName("add_component_button")
+        self.add_component_button.installEventFilter(self.lock_filter) 
         self.add_component_button.clicked.connect(self.add_component_layout)
 
         self.button_h_layout = QHBoxLayout()
@@ -2179,16 +1297,19 @@ class Foundation(QWidget):
 
     def toggle_lock(self):
         self.set_form_locked(not self.is_locked)
-    
+     
+    # --- UPDATED LOCK LOGIC: Only show Icons, Change State on Click ---
     def set_form_locked(self, locked):
         self.is_locked = locked
         
         if locked:
             self.lock_button.setText("🔒")
             self.lock_button.setProperty("locked", "true")
+            self.lock_button.setToolTip("Click to Unlock to Edit")
         else:
             self.lock_button.setText("🔓")
             self.lock_button.setProperty("locked", "false")
+            self.lock_button.setToolTip("Click to Lock Editing")
         
         self.lock_button.style().unpolish(self.lock_button)
         self.lock_button.style().polish(self.lock_button)
@@ -2196,7 +1317,26 @@ class Foundation(QWidget):
         for component_widget in self.component_widgets:
             component_widget.set_locked(locked)
         
-        self.add_component_button.setEnabled(not locked)
+        self.add_component_button.setProperty("locked_state", str(locked).lower())
+        self.add_component_button.style().unpolish(self.add_component_button)
+        self.add_component_button.style().polish(self.add_component_button)
+
+    # --- NEW: Helper method to handle triggering the warning with cooldown ---
+    def trigger_lock_warning(self):
+        if self.warning_cooldown:
+            return
+            
+        self.warning_cooldown = True
+        
+        # Calculate position beside the lock button
+        if self.lock_button:
+            global_pos = self.lock_button.mapToGlobal(QPoint(-80, self.lock_button.height() + 5))
+            QToolTip.showText(global_pos, "Unlock to Edit", self.lock_button, self.lock_button.rect(), 2000)
+            
+        QTimer.singleShot(2000, self._reset_warning_cooldown)
+
+    def _reset_warning_cooldown(self):
+        self.warning_cooldown = False
 
     def collect_data(self):
         all_data = []
@@ -2204,12 +1344,12 @@ class Foundation(QWidget):
             component_data = component_widget.collect_data()
             all_data.append(component_data)
         return all_data
-    
+     
     def mark_state_changed(self):
         if self._initializing:
             return
         self.state_changed = True
-    
+     
     def save_data(self):
         from pprint import pprint
         data = self.collect_data()
@@ -2217,7 +1357,7 @@ class Foundation(QWidget):
         pprint(data)
             
         if self.data_id:
-            self.data_id = self.database_manager.replace_structure_work_rows(KEY_FOUNDATION, data, self.data_id)
+            self.database_manager.replace_structure_work_rows(KEY_FOUNDATION, data, self.data_id)
         else:
             self.data_id = self.database_manager.input_data_row(KEY_FOUNDATION, data)
         self.state_changed = False
@@ -2236,7 +1376,7 @@ class Foundation(QWidget):
         self.next.emit(KEY_FOUNDATION)
 
     def add_component_layout(self):
-        new_component = ComponentWidget(self)
+        new_component = ComponentWidget(self, self.lock_filter) 
         self.component_widgets.append(new_component)
         new_component.remove_component_button.clicked.connect(lambda: self.remove_component_layout(new_component))
 
@@ -2249,6 +1389,7 @@ class Foundation(QWidget):
         self.scroll_content_layout.addWidget(self.add_component_button, alignment=Qt.AlignCenter)
         self.scroll_content_layout.addLayout(self.button_h_layout) 
 
+        # Initial state sync
         if self.is_locked:
             new_component.set_locked(True)
 
