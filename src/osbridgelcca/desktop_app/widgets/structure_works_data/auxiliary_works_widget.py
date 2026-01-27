@@ -199,17 +199,19 @@ class MaterialInputPopup(QDialog):
     def update_search_results(self, text):
         if not sor_manager or not sor_manager.searcher: return
         
+        # --- ENABLED: Search from SOR Manager (Backend) ---
         backend_results = sor_manager.searcher.performSearch([self.component_name.lower()], text)
         backend_items = [item['name'] for item in backend_results]
 
+        # --- DISABLED: Search from Local Data (Excel) ---
         data_py_items = []
-        if self.material_data_source:
-            norm_text = text.lower().strip()
-            tokens = norm_text.split()
-            for key in self.material_data_source.keys():
-                key_lower = key.lower()
-                if all(t in key_lower for t in tokens):
-                    data_py_items.append(key)
+        # if self.material_data_source:
+        #     norm_text = text.lower().strip()
+        #     tokens = norm_text.split()
+        #     for key in self.material_data_source.keys():
+        #         key_lower = key.lower()
+        #         if all(t in key_lower for t in tokens):
+        #             data_py_items.append(key)
 
         all_items = sorted(list(set(backend_items + data_py_items)))
         self.suggestion_list.clear()
@@ -499,8 +501,7 @@ class ComponentWidget(QWidget):
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
 
-        self.add_material_row()
-        self.add_material_row()
+        
 
         self.update_comp_material(self.component_combobox.currentText())
 
@@ -1165,14 +1166,12 @@ class AuxiliaryWorks(QWidget):
                 border-color: #D0D0D0;
             }
             
-            /* --- UPDATED: Locked State Styling for visual feedback --- */
             QPushButton#add_material_button[locked_state="true"], 
             QPushButton#add_component_button[locked_state="true"] {
                 background-color: #F0F0F0;
                 color: #AAAAAA;
                 border-color: #D0D0D0;
             }
-            /* Use ID selector to override other styles with higher specificity */
             #MaterialGridInput[locked_state="true"] {
                 background-color: #E0E0E0;
                 color: #888888;
@@ -1181,60 +1180,39 @@ class AuxiliaryWorks(QWidget):
         """)
         
         self.left_panel_vlayout = QVBoxLayout(self)
-        self.left_panel_vlayout.setContentsMargins(0,0,0,0)
+        self.left_panel_vlayout.setContentsMargins(0, 0, 0, 0)
         self.left_panel_vlayout.setSpacing(0)
 
-        # --- UPDATED HEADER FOR REGION / SOR (Additional Inputs) ---
         header_container = QWidget()
         header_container.setStyleSheet("background-color: #FFF9F9; border-bottom: 1px solid #ccc;")
         header_layout = QHBoxLayout(header_container)
         header_layout.setContentsMargins(15, 10, 15, 10)
         
-        # 1. Region Input
         header_layout.addWidget(QLabel("Region:"))
         self.region_combo = QComboBox()
         self.region_combo.setFixedWidth(150)
         
-        # Load regions from manager or fallback
         if sor_manager:
             self.region_combo.addItems(sor_manager.get_regions())
-            # --- NEW: Connect to the backend signal for auto-refresh ---
             sor_manager.registry_updated.connect(self.refresh_ui_options)
         else:
-            self.region_combo.addItems(["India", "USA"]) # Fallback
+            self.region_combo.addItems(["India", "USA"]) 
             
         self.region_combo.currentTextChanged.connect(self.on_region_changed)
         header_layout.addWidget(self.region_combo)
         
         header_layout.addSpacing(20)
         
-        # 2. SOR Input
         header_layout.addWidget(QLabel("Select SOR:"))
         self.sor_combo = QComboBox()
         self.sor_combo.setFixedWidth(200)
-        # Initialize SOR list based on current region
         self.on_region_changed(self.region_combo.currentText()) 
         self.sor_combo.currentTextChanged.connect(self.on_sor_changed)
         header_layout.addWidget(self.sor_combo)
         
         header_layout.addStretch()
         
-        # Add Header to Main Layout
         self.left_panel_vlayout.addWidget(header_container)
-
-        lock_hlayout = QHBoxLayout()
-        lock_hlayout.setContentsMargins(0,2,2,0)
-        lock_hlayout.setSpacing(0)
-        lock_hlayout.addStretch()
-
-        self.lock_button = QPushButton("🔓") 
-        self.lock_button.setObjectName("lock_button")
-        self.lock_button.setFixedSize(30, 30) 
-        self.lock_button.setCursor(Qt.PointingHandCursor)
-        self.lock_button.setProperty("locked", "false")
-        self.lock_button.clicked.connect(self.toggle_lock)
-        self.lock_button.setToolTip("Click to Lock Editing") 
-        lock_hlayout.addWidget(self.lock_button)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
@@ -1248,11 +1226,25 @@ class AuxiliaryWorks(QWidget):
         self.scroll_content_layout.setContentsMargins(0,0,0,0)
         self.scroll_content_layout.setSpacing(0)
 
+        lock_hlayout = QHBoxLayout()
+        lock_hlayout.setContentsMargins(0,2,2,0)
+        lock_hlayout.setSpacing(0)
+        lock_hlayout.addStretch()
+
+        self.lock_button = QPushButton("🔓")
+        self.lock_button.setObjectName("lock_button")
+        self.lock_button.setFixedSize(30, 30) 
+        self.lock_button.setCursor(Qt.PointingHandCursor)
+        self.lock_button.setProperty("locked", "false")
+        self.lock_button.clicked.connect(self.toggle_lock)
+        self.lock_button.setToolTip("Click to Lock Editing") 
+        lock_hlayout.addWidget(self.lock_button)
+
         self.scroll_content_layout.addLayout(lock_hlayout)
 
         self.add_component_button = QPushButton("+ Add Component")
         self.add_component_button.setObjectName("add_component_button")
-        self.add_component_button.installEventFilter(self.lock_filter) 
+        self.add_component_button.installEventFilter(self.lock_filter)
         self.add_component_button.clicked.connect(self.add_component_layout)
 
         self.button_h_layout = QHBoxLayout()
@@ -1284,17 +1276,12 @@ class AuxiliaryWorks(QWidget):
         else:
             self.is_first_visit = False
 
-    # --- NEW METHOD: Auto-Refresh UI Options ---
-    @Slot() # Explicitly marked as a Slot for robust Signal connection
+    @Slot()
     def refresh_ui_options(self):
-        """Called automatically when SOR backend updates."""
         print("UI: Refreshing Region/SOR dropdowns...")
-        
-        # Save current selection to restore it after refresh if possible
         current_region = self.region_combo.currentText()
         current_sor = self.sor_combo.currentText()
         
-        # Reload Regions
         self.region_combo.blockSignals(True)
         self.region_combo.clear()
         if sor_manager:
@@ -1303,37 +1290,30 @@ class AuxiliaryWorks(QWidget):
             self.region_combo.addItems(["India", "USA"])
         self.region_combo.blockSignals(False)
         
-        # Restore Region Selection
         idx = self.region_combo.findText(current_region)
         if idx != -1:
             self.region_combo.setCurrentIndex(idx)
         elif self.region_combo.count() > 0:
             self.region_combo.setCurrentIndex(0)
             
-        # Trigger update for SOR list based on the (potentially new) region
         self.on_region_changed(self.region_combo.currentText())
         
-        # Restore SOR Selection
         idx_sor = self.sor_combo.findText(current_sor)
         if idx_sor != -1:
             self.sor_combo.setCurrentIndex(idx_sor)
 
-    # --- NEW: Methods to Handle Region/SOR Changes ---
     def on_region_changed(self, new_region):
-        """Update SOR dropdown when Region changes"""
         if not sor_manager: return
         sors = sor_manager.get_sors_for_region(new_region)
         self.sor_combo.blockSignals(True)
         self.sor_combo.clear()
         self.sor_combo.addItems(sors)
         self.sor_combo.blockSignals(False)
-        # Trigger update for the first SOR in the new list if available
         if sors:
             self.sor_combo.setCurrentIndex(0)
             self.on_sor_changed(sors[0])
 
     def on_sor_changed(self, new_sor):
-        """Tell backend to load new data when SOR changes"""
         if not sor_manager or not new_sor: return
         region = self.region_combo.currentText()
         success, msg = sor_manager.set_active_sor(region, new_sor)
@@ -1344,8 +1324,7 @@ class AuxiliaryWorks(QWidget):
 
     def toggle_lock(self):
         self.set_form_locked(not self.is_locked)
-     
-    # --- UPDATED LOCK LOGIC: Only show Icons, Change State on Click ---
+    
     def set_form_locked(self, locked):
         self.is_locked = locked
         
@@ -1368,68 +1347,23 @@ class AuxiliaryWorks(QWidget):
         self.add_component_button.style().unpolish(self.add_component_button)
         self.add_component_button.style().polish(self.add_component_button)
         
-        # Lock Header inputs too
         self.region_combo.setEnabled(not locked)
         self.sor_combo.setEnabled(not locked)
 
-    # --- NEW: Helper method to handle triggering the warning with cooldown ---
     def trigger_lock_warning(self):
         if self.warning_cooldown:
             return
-            
         self.warning_cooldown = True
-        
-        # Calculate position beside the lock button
         if self.lock_button:
             global_pos = self.lock_button.mapToGlobal(QPoint(-80, self.lock_button.height() + 5))
             QToolTip.showText(global_pos, "Unlock to Edit", self.lock_button, self.lock_button.rect(), 2000)
-            
         QTimer.singleShot(2000, self._reset_warning_cooldown)
 
     def _reset_warning_cooldown(self):
         self.warning_cooldown = False
 
-    def collect_data(self):
-        all_data = []
-        for component_widget in self.component_widgets:
-            component_data = component_widget.collect_data()
-            all_data.append(component_data)
-        return all_data
-     
-    def mark_state_changed(self):
-        if self._initializing:
-            return
-        self.state_changed = True
-     
-    def save_data(self):
-        from pprint import pprint
-        data = self.collect_data()
-        print("\nCollected Data from Auxiliary Works UI:")
-        # Include context in debug output
-        print(f"Context -> Region: {self.region_combo.currentText()}, SOR: {self.sor_combo.currentText()}")
-        pprint(data)
-            
-        if self.data_id:
-            self.database_manager.replace_structure_work_rows(KEY_AUXILIARY, data, self.data_id)
-        else:
-            self.data_id = self.database_manager.input_data_row(KEY_AUXILIARY, data)
-        self.state_changed = False
-
-    def on_next_clicked(self):
-        if not self.state_changed:
-            self.next.emit(KEY_AUXILIARY)
-            return
-        if self.data_id:
-            message = "Do you want to replace previous data?"
-        else:
-            message = "Do you want to save data?"
-        reply = QMessageBox.question(self, "Confirm", message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if reply == QMessageBox.StandardButton.Yes:
-            self.save_data()
-        self.next.emit(KEY_AUXILIARY)
-
     def add_component_layout(self):
-        new_component = ComponentWidget(self, self.lock_filter) 
+        new_component = ComponentWidget(self, self.lock_filter)
         self.component_widgets.append(new_component)
         new_component.remove_component_button.clicked.connect(lambda: self.remove_component_layout(new_component))
 
@@ -1440,9 +1374,8 @@ class AuxiliaryWorks(QWidget):
 
         self.scroll_content_layout.addWidget(new_component)
         self.scroll_content_layout.addWidget(self.add_component_button, alignment=Qt.AlignCenter)
-        self.scroll_content_layout.addLayout(self.button_h_layout) 
+        self.scroll_content_layout.addLayout(self.button_h_layout)
 
-        # Initial state sync
         if self.is_locked:
             new_component.set_locked(True)
 
@@ -1459,7 +1392,46 @@ class AuxiliaryWorks(QWidget):
             self.scroll_area.widget().adjustSize()
             self.mark_state_changed()
 
+    def collect_data(self):
+        all_data = []
+        for component_widget in self.component_widgets:
+            component_data = component_widget.collect_data()
+            all_data.append(component_data)
+        return all_data
+    
+    def mark_state_changed(self):
+        if self._initializing:
+            return
+        self.state_changed = True
+    
+    def save_data(self):
+        from pprint import pprint
+        data = self.collect_data()
+        print("\nCollected Data from Auxiliary Works UI:")
+        print(f"Context -> Region: {self.region_combo.currentText()}, SOR: {self.sor_combo.currentText()}")
+        pprint(data)
+            
+        if self.data_id:
+            self.database_manager.replace_structure_work_rows(KEY_AUXILIARY, data, self.data_id)
+        else:
+            self.data_id = self.database_manager.input_data_row(KEY_AUXILIARY, data)
+        self.state_changed = False
+    
+    def on_next_clicked(self):
+        if not self.state_changed:
+            self.next.emit(KEY_AUXILIARY)
+            return
+        if self.data_id:
+            message = "Do you want to replace previous data?"
+        else:
+            message = "Do you want to save data?"
+        reply = QMessageBox.question(self, "Confirm", message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            self.save_data()
+        self.next.emit(KEY_AUXILIARY)
+
     def expand_scroll_area(self):
+        # self.central_widget.layout().invalidate()
         pass
 
     def close_widget(self):

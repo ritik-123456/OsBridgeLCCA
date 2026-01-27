@@ -211,18 +211,20 @@ class MaterialInputPopup(QDialog):
         # Use the dynamic searcher from the manager
         if not sor_manager or not sor_manager.searcher: return
         
+        # --- ENABLED: Search from SOR Manager (Backend) ---
         # Note: searcher logic is encapsulated in sor_backend
         backend_results = sor_manager.searcher.performSearch([self.component_name.lower()], text)
         backend_items = [item['name'] for item in backend_results]
 
+        # --- DISABLED: Search from Local Data (Excel) ---
         data_py_items = []
-        if self.material_data_source:
-            norm_text = text.lower().strip()
-            tokens = norm_text.split()
-            for key in self.material_data_source.keys():
-                key_lower = key.lower()
-                if all(t in key_lower for t in tokens):
-                    data_py_items.append(key)
+        # if self.material_data_source:
+        #     norm_text = text.lower().strip()
+        #     tokens = norm_text.split()
+        #     for key in self.material_data_source.keys():
+        #         key_lower = key.lower()
+        #         if all(t in key_lower for t in tokens):
+        #             data_py_items.append(key)
 
         all_items = sorted(list(set(backend_items + data_py_items)))
         self.suggestion_list.clear()
@@ -526,9 +528,6 @@ class ComponentWidget(QWidget):
                 self.material_grid_layout.addWidget(label, 0, grid_col)
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
-
-        self.add_material_row()
-        self.add_material_row()
 
         self.update_comp_material(self.component_combobox.currentText())
 
