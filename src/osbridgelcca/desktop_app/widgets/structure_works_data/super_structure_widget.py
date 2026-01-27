@@ -499,8 +499,8 @@ class ComponentWidget(QWidget):
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
 
-        self.add_material_row()
-        self.add_material_row()
+        # self.add_material_row()
+        # self.add_material_row()
 
         self.update_comp_material(self.component_combobox.currentText())
 
@@ -1436,3 +1436,150 @@ class SuperStructure(QWidget):
     def close_widget(self):
         self.closed.emit()
         self.setParent(None)
+    
+    #Ritik - START: Improved Excel Data Mapping for SuperStructure Widget
+    def load_from_excel_sections(self, sections_data):
+        """
+        Load parsed Excel data sections into the SuperStructure widget.
+        Data is grouped by component type - all materials for the same component
+        are displayed under one component widget.
+        """
+        print(f"\n[EXCEL IMPORT] Loading {len(sections_data)} section(s) into SuperStructure widget")
+
+        # Ritik - START: Remove any existing default components so imported data replaces them
+        # Remove any existing default components so imported data replaces them
+        if getattr(self, 'component_widgets', None):
+            print(f"  [INFO] Clearing {len(self.component_widgets)} existing component(s) before import")
+            while self.component_widgets:
+                self.remove_component_layout(self.component_widgets[-1])
+        # Ritik - END: Removed default components prior to Excel import
+        
+        # ritik: GROUP DATA BY COMPONENT TYPE
+        component_data_map = {}
+        total_materials = 0
+        
+        for section_idx, section in enumerate(sections_data):
+            component_name = section.get('type', '')
+            rows = section.get('data', [])
+            sheet_name = section.get('sheetName', 'Unknown')
+            
+            if not component_name:
+                print(f"  [SKIP] Section {section_idx}: No component name found")
+                continue
+            
+            print(f"  [SECTION {section_idx}] Sheet: {sheet_name}, Component: {component_name}, Rows: {len(rows)}")
+            
+            if component_name not in component_data_map:
+                component_data_map[component_name] = []
+                print(f"    ✓ Grouped component: {component_name}")
+            
+            component_data_map[component_name].extend(rows)
+            total_materials += len(rows)
+        
+        print(f"\n  [GROUPING] Total materials: {total_materials}, Total components: {len(component_data_map)}")
+        
+        # ritik: CREATE COMPONENT WIDGETS AND POPULATE WITH GROUPED DATA
+        for component_idx, (component_name, all_rows) in enumerate(component_data_map.items()):
+            print(f"\n  [COMPONENT {component_idx}] {component_name} ({len(all_rows)} materials)")
+            
+            self.add_component_layout()
+            new_comp_widget = self.component_widgets[-1]
+            
+            index = new_comp_widget.component_combobox.findText(component_name, Qt.MatchFixedString)
+            if index >= 0:
+                new_comp_widget.component_combobox.setCurrentIndex(index)
+                print(f"    ✓ Set component dropdown to: {component_name}")
+            else:
+                new_comp_widget.component_combobox.addItem(component_name)
+                new_comp_widget.component_combobox.setCurrentText(component_name)
+                print(f"    ✓ Added new component: {component_name}")
+
+            # Ritik - COMMENT OUT: clear_rows() has issues with rowSpan, just add materials instead
+            # new_comp_widget.clear_rows()
+            
+            for row_idx, row_data in enumerate(all_rows):
+                try:
+                    material_name = str(row_data.get('name', '')).strip()
+                    if not material_name:
+                        print(f"      [WARN] Material {row_idx}: Missing material name, skipping")
+                        continue
+                    
+                    quantity_val = row_data.get('quantity', '1')
+                    try:
+                        quantity_str = str(float(quantity_val))
+                    except (ValueError, TypeError):
+                        quantity_str = '1'
+                        print(f"      [INFO] Material {row_idx}: Invalid quantity '{quantity_val}', using default '1'")
+                    
+                    unit_val = str(row_data.get('unit', '')).lower().strip()
+                    if not unit_val or unit_val == 'none':
+                        unit_val = 'cum'
+                        print(f"      [INFO] Material {row_idx}: No unit specified, using default 'cum'")
+                    
+                    rate_val = row_data.get('rate', '0')
+                    try:
+                        rate_str = str(float(rate_val))
+                    except (ValueError, TypeError):
+                        rate_str = '0'
+                        print(f"      [INFO] Material {row_idx}: Invalid rate '{rate_val}', using default '0'")
+                    
+                    rate_source = str(row_data.get('rate_src', 'Excel Import')).strip()
+                    if not rate_source:
+                        rate_source = 'Excel Import'
+                    
+                    carbon_emission_val = row_data.get('carbon_emission', 'not_available')
+                    if carbon_emission_val is None:
+                        carbon_emission_str = 'not_available'
+                    else:
+                        carbon_emission_str = str(carbon_emission_val).strip()
+                        if not carbon_emission_str or carbon_emission_str.lower() in ['na', 'not available', 'not_available', 'none']:
+                            carbon_emission_str = 'not_available'
+                    
+                    carbon_units = str(row_data.get('carbon_emission_units', 'kgCO2e')).strip()
+                    if not carbon_units:
+                        carbon_units = 'kgCO2e'
+                    
+                    conversion_factor_val = row_data.get('conversion_factor', 'not_available')
+                    if conversion_factor_val is None:
+                        conversion_factor_str = 'not_available'
+                    else:
+                        conversion_factor_str = str(conversion_factor_val).strip()
+                        if not conversion_factor_str or conversion_factor_str.lower() in ['na', 'not available', 'not_available', 'none']:
+                            conversion_factor_str = 'not_available'
+                    
+                    carbon_source = str(row_data.get('carbon_emission_src', '')).strip()
+                    
+                    recycleable_val = row_data.get('recycleable', 'Non-recyclable')
+                    recycleable_str = str(recycleable_val).strip() if recycleable_val else 'Non-recyclable'
+                    is_recyclable = recycleable_str.lower() in ['recyclable', 'recycleable', 'yes', 'true']
+                    
+                    mapped_data = {
+                        KEY_TYPE: material_name,
+                        KEY_QUANTITY: quantity_str,
+                        KEY_UNIT_M3: unit_val,
+                        KEY_RATE: rate_str,
+                        KEY_RATE_DATA_SOURCE: rate_source,
+                        "carbon_emission": carbon_emission_str,
+                        "carbon_unit": carbon_units,
+                        "conversion_factor": conversion_factor_str,
+                        "carbon_source": carbon_source,
+                        "recyclable": is_recyclable,
+                        "save_to_db": False,
+                        "is_custom": True
+                    }
+                    
+                    if hasattr(new_comp_widget, 'add_custom_material_row'):
+                        new_comp_widget.add_custom_material_row(mapped_data)
+                        print(f"      ✓ Material {row_idx}: {material_name} | {quantity_str} {unit_val} @ {rate_source}")
+                    else:
+                        new_comp_widget.add_material_row(mapped_data)
+                        print(f"      ✓ Material {row_idx}: {material_name} | {quantity_str} {unit_val}")
+                        
+                except Exception as e:
+                    print(f"      [ERROR] Material {row_idx}: Failed to process - {str(e)}")
+                    continue
+        
+        self.mark_state_changed()
+        print(f"\n[EXCEL IMPORT] ✓ Complete. All data grouped by components and loaded.\n")
+
+    #Ritik - END: Improved Excel Data Mapping for SuperStructure Widget
