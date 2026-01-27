@@ -7,7 +7,12 @@
 from PySide6.QtCore import (QSize, Qt, QPropertyAnimation, QEasingCurve)
 from PySide6.QtGui import (QAction,QFont, QFontDatabase, QIcon)
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QTextEdit, QScrollArea, QSpacerItem, QSizePolicy,
+<<<<<<< HEAD
     QMenu, QMenuBar, QPushButton, QWidget, QLabel, QVBoxLayout, QGridLayout, QLineEdit, QComboBox)
+=======
+                               QMenu, QMenuBar, QPushButton, QWidget, QLabel, QVBoxLayout, QGridLayout, 
+                               QLineEdit, QComboBox, QFileDialog, QDialog, QFormLayout, QDialogButtonBox, QMessageBox)
+>>>>>>> 1ab482d (mappingdone)
 
 from osbridgelcca.desktop_app.widgets.title_bar import CustomTitleBar
 from osbridgelcca.desktop_app.widgets.project_details_right_widget import ProjectDetailsWidget
@@ -81,6 +86,7 @@ def parse_and_validate_excel(file_path):
 
             first_val = str(row[0]).strip() if pd.notna(row[0]) else ""
 
+<<<<<<< HEAD
             # 1. Identify Header (CID#)
             if first_val.startswith('CID#'):
                 current_keys = []
@@ -94,6 +100,20 @@ def parse_and_validate_excel(file_path):
                 continue
 
             # 2. Identify Section
+=======
+            # 1. Header
+            if first_val.startswith('CID#'):
+                current_keys = []
+                for i, val in enumerate(row):
+                    if pd.notna(val) and str(val).strip():
+                        current_keys.append((i, clean_header(str(val))))
+                continue
+
+            if first_val == 'Material':
+                continue
+
+            # 2. Section
+>>>>>>> 1ab482d (mappingdone)
             col2 = row[2] if len(row) > 2 else np.nan
             col3 = row[3] if len(row) > 3 else np.nan
 
@@ -109,15 +129,20 @@ def parse_and_validate_excel(file_path):
                 section_seen_data = {}
                 continue
 
-            # 3. Process Data Row
+            # 3. Data row
             if current_section and current_keys:
                 raw_row_data = {}
                 for col_idx, key in current_keys:
+<<<<<<< HEAD
                     if col_idx < len(row):
                         val = row[col_idx]
                         raw_row_data[key] = None if pd.isna(val) or str(val).strip() == "" else val
                     else:
                         raw_row_data[key] = None
+=======
+                    val = row[col_idx] if col_idx < len(row) else None
+                    raw_row_data[key] = None if pd.isna(val) or str(val).strip() == "" else val
+>>>>>>> 1ab482d (mappingdone)
 
                 qty_val = raw_row_data.get('quantity')
                 if qty_val is None:
@@ -132,6 +157,7 @@ def parse_and_validate_excel(file_path):
                 if not is_valid_number(qty_val):
                     global_errors.append(f"{row_context} - Error: Quantity '{qty_val}' is not a valid number.")
                     row_has_critical_error = True
+<<<<<<< HEAD
 
                 # Rate
                 rate_val = final_row_data.get('rate')
@@ -145,6 +171,24 @@ def parse_and_validate_excel(file_path):
                 if final_row_data.get('carbon_emission_src') is None:
                     global_warnings.append(f"{row_context} - Warning: 'carbon_emission_src' is missing.")
 
+=======
+
+                # Rate
+                rate_val = final_row_data.get('rate')
+                if rate_val is None:
+                    global_errors.append(f"{row_context} - Error: Quantity is present but 'rate' is missing.")
+                    row_has_critical_error = True
+                elif not is_valid_number(rate_val):
+                    global_errors.append(f"{row_context} - Error: Rate '{rate_val}' is not a valid number.")
+                    row_has_critical_error = True
+
+                # Sources
+                if final_row_data.get('rate_src') is None:
+                    global_warnings.append(f"{row_context} - Warning: 'rate_src' is missing.")
+                if final_row_data.get('carbon_emission_src') is None:
+                    global_warnings.append(f"{row_context} - Warning: 'carbon_emission_src' is missing.")
+
+>>>>>>> 1ab482d (mappingdone)
                 # Flexible fields
                 for field in FLEXIBLE_FIELD_CONFIG:
                     val = final_row_data.get(field)
@@ -158,6 +202,7 @@ def parse_and_validate_excel(file_path):
 
                 # Unit
                 unit_val = final_row_data.get('unit')
+<<<<<<< HEAD
                 if not unit_val or str(unit_val).strip().lower() not in ALLOWED_UNITS:
                     global_errors.append(f"{row_context} - Error: Invalid or missing unit.")
                     row_has_critical_error = True
@@ -167,27 +212,58 @@ def parse_and_validate_excel(file_path):
                 if recycle_val is None or str(recycle_val).strip() == "":
                     global_warnings.append(
                         f"{row_context} - Warning: 'recycleable' blank, assumed non-recyclable."
+=======
+                if unit_val:
+                    if str(unit_val).strip().lower() not in ALLOWED_UNITS:
+                        global_errors.append(f"{row_context} - Error: Unit '{unit_val}' is not valid.")
+                        row_has_critical_error = True
+                else:
+                    global_errors.append(f"{row_context} - Error: Unit is missing.")
+                    row_has_critical_error = True
+
+                # Recycleable
+                recycle_val = final_row_data.get('recycleable')
+                if recycle_val is None or str(recycle_val).strip() == "":
+                    global_warnings.append(
+                        f"{row_context} - Warning: 'recycleable' field is blank."
+>>>>>>> 1ab482d (mappingdone)
                     )
                 else:
                     if str(recycle_val).strip().lower() not in ALLOWED_RECYCLE_VALUES:
                         global_errors.append(
+<<<<<<< HEAD
                             f"{row_context} - Error: Invalid 'recycleable' value '{recycle_val}'."
                         )
                         row_has_critical_error = True
 
                 # Duplicate check
+=======
+                            f"{row_context} - Error: Invalid value '{recycle_val}' for 'recycleable'."
+                        )
+                        row_has_critical_error = True
+
+                # Duplicate
+>>>>>>> 1ab482d (mappingdone)
                 name_val = final_row_data.get('name')
                 if name_val:
                     if name_val in section_seen_data:
                         original = section_seen_data[name_val]
                         if final_row_data == original['data']:
                             global_warnings.append(
+<<<<<<< HEAD
                                 f"{row_context} - Warning: Duplicate '{name_val}' merged."
+=======
+                                f"{row_context} - Warning: Duplicate material '{name_val}' merged."
+>>>>>>> 1ab482d (mappingdone)
                             )
                             is_duplicate = True
                         else:
                             global_errors.append(
+<<<<<<< HEAD
                                 f"{row_context} - Error: Duplicate '{name_val}' with conflicts."
+=======
+                                f"{row_context} - Error: Conflicting duplicate '{name_val}'."
+>>>>>>> 1ab482d (mappingdone)
                             )
                             is_duplicate = True
                     else:
@@ -210,13 +286,189 @@ def parse_and_validate_excel(file_path):
         "parsed_data": parsed_sections
     }
 
+<<<<<<< HEAD
    
 
 
 
 class UiMainWindow(object):
+=======
+
+# --- NEW CLASS: SOR Metadata Dialog ---
+# class SORMetadataDialog(QDialog):
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.setWindowTitle("SOR Details")
+#         self.setFixedWidth(400)
+#         self.layout = QFormLayout(self)
+        
+#         self.region_input = QLineEdit()
+#         self.region_input.setPlaceholderText("e.g. India")
+#         self.sor_name_input = QLineEdit() 
+#         self.sor_name_input.setPlaceholderText("e.g. Bihar SOR 2024")
+        
+#         self.layout.addRow("Region:", self.region_input)
+#         self.layout.addRow("SOR Name:", self.sor_name_input)
+        
+#         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+#         self.buttons.accepted.connect(self.accept)
+#         self.buttons.rejected.connect(self.reject)
+#         self.layout.addRow(self.buttons)
+
+#     def get_data(self):
+#         return self.region_input.text(), self.sor_name_input.text()
+
+
+# ================== ERROR/WARNING HANDLING & DATA MAPPING ==================
+
+def show_error_message(error_list, parent=None):
+    """Display errors in a message box and return False (stop processing)"""
+    error_text = "❌ ERRORS FOUND - Import Stopped\n\n"
+    error_text += "═" * 60 + "\n"
+    for idx, error in enumerate(error_list, 1):
+        error_text += f"{idx}. {error}\n"
+    error_text += "═" * 60
+    
+    QMessageBox.critical(parent, "Excel Import - Errors", error_text)
+    return False
+
+def show_warning_message(warning_list, parent=None):
+    """Display warnings in a message box and continue processing"""
+    warning_text = "⚠️  WARNINGS\n\n"
+    warning_text += "═" * 60 + "\n"
+    for idx, warning in enumerate(warning_list, 1):
+        warning_text += f"{idx}. {warning}\n"
+    warning_text += "═" * 60 + "\n"
+    warning_text += "\nData will be imported with warnings."
+    
+    QMessageBox.warning(parent, "Excel Import - Warnings", warning_text)
+    return True
+
+def map_parsed_data_to_widgets(parsed_data, ui_instance):
+    """
+    Map parsed Excel data to the respective widgets.
+    
+    Args:
+        parsed_data: List of sections from parse_and_validate_excel
+        ui_instance: The UiMainWindow instance to access widgets
+    """
+    print("\n[MAPPING] Starting data mapping to widgets...")
+    
+    # Sheet name mapping to widget keys
+    sheet_map = {
+        "foundation": KEY_FOUNDATION,
+        "sub structure": KEY_SUBSTRUCTURE,
+        "sub-structure": KEY_SUBSTRUCTURE,
+        "substructure": KEY_SUBSTRUCTURE,
+        "super structure": KEY_SUPERSTRUCTURE,
+        "super-structure": KEY_SUPERSTRUCTURE,
+        "superstructure": KEY_SUPERSTRUCTURE,
+        "miscellaneous": KEY_AUXILIARY,
+        "auxiliary": KEY_AUXILIARY,
+        "auxiliary works": KEY_AUXILIARY,
+    }
+    
+    # Get widget references based on UI layout
+    widget_refs = {}
+    
+    # If using tab view
+    if hasattr(ui_instance, 'tabs_active') and ui_instance.tabs_active:
+        if hasattr(ui_instance, 'active_tab_widgets') and hasattr(ui_instance, 'current_right_widget'):
+            for widget_key, tab_idx in ui_instance.active_tab_widgets.items():
+                if hasattr(ui_instance.current_right_widget, 'widget'):
+                    widget_refs[widget_key] = ui_instance.current_right_widget.widget(tab_idx)
+    # If using single view
+    elif hasattr(ui_instance, 'current_right_widget'):
+        widget_refs[KEY_FOUNDATION] = ui_instance.current_right_widget if isinstance(ui_instance.current_right_widget, Foundation) else None
+        widget_refs[KEY_SUBSTRUCTURE] = ui_instance.current_right_widget if isinstance(ui_instance.current_right_widget, SubStructure) else None
+        widget_refs[KEY_SUPERSTRUCTURE] = ui_instance.current_right_widget if isinstance(ui_instance.current_right_widget, SuperStructure) else None
+        widget_refs[KEY_AUXILIARY] = ui_instance.current_right_widget if isinstance(ui_instance.current_right_widget, AuxiliaryWorks) else None
+    
+    # Process each section
+    for section in parsed_data:
+        sheet_name = str(section.get('sheetName', '')).lower().strip()
+        component_type = section.get('type', '')
+        data_items = section.get('data', [])
+        
+        print(f"\n[SECTION] Sheet: {sheet_name}, Type: {component_type}, Items: {len(data_items)}")
+        
+        # Find matching widget key
+        widget_key = None
+        for alias, key_const in sheet_map.items():
+            if alias in sheet_name:
+                widget_key = key_const
+                break
+        
+        if not widget_key:
+            print(f"  [WARN] No widget found for sheet: {sheet_name}")
+            continue
+        
+        # Get the widget instance
+        widget = widget_refs.get(widget_key)
+        if not widget:
+            print(f"  [WARN] Widget instance not found for key: {widget_key}")
+            continue
+        
+        print(f"  [OK] Widget found for {widget_key}")
+        
+        # Map data to the widget
+        try:
+            map_section_to_widget(widget, component_type, data_items)
+            print(f"  [OK] Successfully mapped {len(data_items)} items to {component_type}")
+        except Exception as e:
+            print(f"  [ERROR] Failed to map data: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+def map_section_to_widget(widget, component_type, data_items):
+    """
+    Map a section's data items to a specific widget component.
+    
+    Args:
+        widget: The widget instance (Foundation, SubStructure, etc.)
+        component_type: The component name (e.g., "Excavation", "Pile")
+        data_items: List of data items to map
+    """
+    # Check if widget has the component
+    if not hasattr(widget, 'component_combobox'):
+        print(f"    [WARN] Widget has no component_combobox")
+        return
+    
+    # Set the component dropdown to the component type
+    combo = widget.component_combobox
+    combo.setCurrentText(component_type)
+    print(f"    [SET] Component dropdown to: {component_type}")
+    
+    # Clear existing material rows (keep header row)
+    if hasattr(widget, 'material_rows'):
+        while len(widget.material_rows) > 2:  # Keep initial 2 rows
+            widget.remove_material_row()
+    
+    # Add each data item as a material row
+    for idx, item in enumerate(data_items):
+        data_dict = {
+            KEY_TYPE: item.get('name', ''),
+            KEY_QUANTITY: item.get('quantity', ''),
+            KEY_UNIT_M3: item.get('unit', 'cum'),
+            KEY_RATE: item.get('rate', ''),
+            KEY_RATE_DATA_SOURCE: item.get('rate_src', ''),
+            'is_custom': True  # Mark as custom material
+        }
+        
+        print(f"    [ITEM {idx+1}] Adding: {data_dict[KEY_TYPE]}")
+        
+        # Add the row with data
+        if hasattr(widget, 'add_row_from_popup_data'):
+            widget.add_row_from_popup_data(data_dict)
+        else:
+            print(f"      [WARN] Widget has no add_row_from_popup_data method")
+
+
+class UiMainWindow(object):
+    #Ritik
+>>>>>>> 1ab482d (mappingdone)
     def open_excel_dialog(self):
-        print("Upload Excel clicked")
+        print("[UI] Upload Excel clicked")
 
         file_path, _ = QFileDialog.getOpenFileName(
             None,
@@ -226,38 +478,171 @@ class UiMainWindow(object):
         )
 
         if not file_path:
-            print("No file selected")
+            print("[UI] No file selected")
             return
 
-        print(f"\nSelected file: {file_path}")
+        print(f"[UI] Excel selected: {file_path}")
 
         result = parse_and_validate_excel(file_path)
 
+<<<<<<< HEAD
         if result is None:
             print("[FATAL] Parser returned None. Check parse_and_validate_excel().")
+=======
+        print("\n========== PARSER OUTPUT ==========\n")
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        
+        # ========== NEW: Handle errors and warnings ==========
+        validation_report = result.get('validation_report', {})
+        errors = validation_report.get('errors', [])
+        warnings = validation_report.get('warnings', [])
+        parsed_data = result.get('parsed_data', [])
+        
+        # If there are errors, show error message and stop
+        if errors:
+            print(f"\n[ERROR] Found {len(errors)} error(s)")
+            show_error_message(errors, parent=self.windows)
+>>>>>>> 1ab482d (mappingdone)
             return
+        
+        # If no errors but warnings exist, show warning message
+        if warnings:
+            print(f"\n[WARNING] Found {len(warnings)} warning(s)")
+            show_warning_message(warnings, parent=self.windows)
+        else:
+            print(f"\n[SUCCESS] No errors or warnings found")
+        
+        # Proceed with mapping (both for warnings-only and no-warnings cases)
+        print(f"\n[MAPPING] Starting mapping of {len(parsed_data)} section(s)...")
+        self.distribute_imported_data(parsed_data)
 
+<<<<<<< HEAD
         try:
             result = parse_and_validate_excel(file_path)
 
             validation = result.get("validation_report", {})
             errors = validation.get("errors", [])
             warnings = validation.get("warnings", [])
+=======
+>>>>>>> 1ab482d (mappingdone)
 
-            print("\n--- ERRORS ---")
-            for e in errors or ["No errors found"]:
-                print(e)
 
-            print("\n--- WARNINGS ---")
-            for w in warnings or ["No warnings found"]:
-                print(w)
+    # --- Ritik - START: Distribute imported Excel data to widgets ---
+    def distribute_imported_data(self, parsed_data):
+        """
+        Distribute parsed Excel sections to their respective widget.
+        Handles both Tab View and Single View layouts.
+        """
+        #Ritik: Print debug info
+        print(f"\n[DISTRIBUTE] Started distribution of {len(parsed_data)} section(s)")
+        print(f"[DEBUG] self.tabs_active: {self.tabs_active}")
+        print(f"[DEBUG] self.current_right_widget: {self.current_right_widget}")
+        print(f"[DEBUG] Widget type: {type(self.current_right_widget)}")
+        
+        sheet_map = {
+            "foundation": KEY_FOUNDATION,
+            "sub structure": KEY_SUBSTRUCTURE,
+            "sub-structure": KEY_SUBSTRUCTURE,
+            "substructure": KEY_SUBSTRUCTURE,
+            "super structure": KEY_SUPERSTRUCTURE,
+            "super-structure": KEY_SUPERSTRUCTURE,
+            "superstructure": KEY_SUPERSTRUCTURE,
+            "miscellaneous": KEY_AUXILIARY,
+            "auxiliary works": KEY_AUXILIARY,
+            "auxiliary": KEY_AUXILIARY
+        }
 
+<<<<<<< HEAD
             print("\n--- PARSED DATA ---")
             print(json.dumps(result.get("parsed_data", []), indent=2))
 
         except Exception as e:
             print("[FATAL] Excel parsing failed")
             print(e)
+=======
+        grouped_data = {}
+        for section in parsed_data:
+            sheet_name_clean = str(section.get('sheetName', '')).lower().strip()
+            print(f"  [SECTION] Sheet name (clean): '{sheet_name_clean}'")
+            
+            target_key = None
+            for key_alias, key_const in sheet_map.items():
+                if key_alias in sheet_name_clean:
+                    target_key = key_const
+                    print(f"    ✓ Matched to key: {key_const}")
+                    break
+            
+            if target_key:
+                if target_key not in grouped_data: grouped_data[target_key] = []
+                grouped_data[target_key].append(section)
+            else:
+                print(f"    [WARN] No matching widget key found for sheet: {sheet_name_clean}")
+
+        print(f"\n[GROUPING] Grouped into {len(grouped_data)} widget(s)")
+        for widget_key, sections in grouped_data.items():
+            print(f"  {widget_key}: {len(sections)} section(s)")
+
+        # Distribute to widgets
+        for widget_key, sections in grouped_data.items():
+            print(f"\n[DISTRIBUTING] To widget: {widget_key}")
+            
+            # If in Tab View - widget already exists
+            if self.tabs_active and widget_key in self.active_tab_widgets:
+                tab_idx = self.active_tab_widgets[widget_key]
+                print(f"  [TAB VIEW] Tab index: {tab_idx}")
+                
+                if hasattr(self.current_right_widget, 'widget'):
+                    widget_instance = self.current_right_widget.widget(tab_idx)
+                    print(f"  [TAB VIEW] Widget instance: {type(widget_instance)}")
+                    
+                    if hasattr(widget_instance, 'load_from_excel_sections'):
+                        print(f"  ✓ Calling load_from_excel_sections() with {len(sections)} section(s)")
+                        widget_instance.load_from_excel_sections(sections)
+                    else:
+                        print(f"  [ERROR] Widget has no load_from_excel_sections method")
+                else:
+                    print(f"  [ERROR] current_right_widget has no widget() method")
+                    
+            # If NOT in Tab View - need to create widget if needed
+            else:
+                print(f"  [CREATE TAB] Creating/accessing widget for {widget_key}")
+                target_class = self.widget_map.get(widget_key)
+                
+                if not target_class:
+                    print(f"  [ERROR] No widget class found for key: {widget_key}")
+                    continue
+                
+                # Check if we need to set up tab view first
+                if not self.tabs_active:
+                    print(f"  [SETUP TABS] Initializing tab view")
+                    self.tabs_active = True
+                    self.active_tab_widgets = {}
+                    self.current_right_widget = CustomTabWidget(parent=self)
+                    self.right_panel_placeholder.layout().addWidget(self.current_right_widget)
+                
+                # Create the widget if it doesn't exist
+                if widget_key not in self.active_tab_widgets:
+                    print(f"  [CREATE] Creating new {target_class.__name__} instance")
+                    widget_instance = target_class(database=self.database_manager, parent=self)
+                    widget_instance.next.connect(self.next_widget)
+                    widget_instance.back.connect(self.prev_widget)
+                    tab_idx = self.current_right_widget.add_new_tab(widget_instance, widget_key)
+                    self.active_tab_widgets[widget_key] = tab_idx
+                    print(f"  [OK] Widget created with tab index: {tab_idx}")
+                else:
+                    tab_idx = self.active_tab_widgets[widget_key]
+                    widget_instance = self.current_right_widget.widget(tab_idx)
+                    print(f"  [OK] Widget already exists with tab index: {tab_idx}")
+                
+                # Now load the data
+                if hasattr(widget_instance, 'load_from_excel_sections'):
+                    print(f"  ✓ Calling load_from_excel_sections() with {len(sections)} section(s)")
+                    widget_instance.load_from_excel_sections(sections)
+                else:
+                    print(f"  [ERROR] Widget has no load_from_excel_sections method")
+
+        print(f"\n[DISTRIBUTE] ✓ Distribution complete\n")
+>>>>>>> 1ab482d (mappingdone)
 
     def setupUi(self, MainWindow):
         self.database_manager = DatabaseManager()
@@ -578,7 +963,7 @@ class UiMainWindow(object):
         button_layout.addWidget(self.save_button)
 
         # --- ADDED: Upload Excel Button ---
-        self.upload_excel_button = QPushButton("Upload Excel")
+        self.upload_excel_button = QPushButton("Upload excel")
         self.upload_excel_button.setObjectName("upload_excel_button")
         #CHANGES MADE BY RITIK: Connect Upload Excel button to file dialog
         self.upload_excel_button.clicked.connect(self.open_excel_dialog)
