@@ -199,17 +199,19 @@ class MaterialInputPopup(QDialog):
     def update_search_results(self, text):
         if not sor_manager or not sor_manager.searcher: return
         
+        # --- ENABLED: Search from SOR Manager (Backend) ---
         backend_results = sor_manager.searcher.performSearch([self.component_name.lower()], text)
         backend_items = [item['name'] for item in backend_results]
 
+        # --- DISABLED: Search from Local Data (Excel) ---
         data_py_items = []
-        if self.material_data_source:
-            norm_text = text.lower().strip()
-            tokens = norm_text.split()
-            for key in self.material_data_source.keys():
-                key_lower = key.lower()
-                if all(t in key_lower for t in tokens):
-                    data_py_items.append(key)
+        # if self.material_data_source:
+        #     norm_text = text.lower().strip()
+        #     tokens = norm_text.split()
+        #     for key in self.material_data_source.keys():
+        #         key_lower = key.lower()
+        #         if all(t in key_lower for t in tokens):
+        #             data_py_items.append(key)
 
         all_items = sorted(list(set(backend_items + data_py_items)))
         self.suggestion_list.clear()
