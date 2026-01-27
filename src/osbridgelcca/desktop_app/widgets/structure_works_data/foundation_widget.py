@@ -527,8 +527,8 @@ class ComponentWidget(QWidget):
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
 
-        self.add_material_row()
-        self.add_material_row()
+        # self.add_material_row()
+        # self.add_material_row()
 
         self.update_comp_material(self.component_combobox.currentText())
 
@@ -944,6 +944,15 @@ class ComponentWidget(QWidget):
         self.adjustSize()
         self._on_value_changed()
 
+    #ritik
+    
+    # --- ADDED THIS METHOD ---
+    def clear_rows(self):
+        rows_to_remove = self.material_rows[:]
+        for row_dict in rows_to_remove:
+            self.remove_material_row_by_widgets(row_dict)
+    #ritik
+
     def remove_material_row_by_widgets(self, row_widgets_to_remove):
         if row_widgets_to_remove not in self.material_rows:
             return
@@ -975,30 +984,47 @@ class ComponentWidget(QWidget):
         self.material_rows.remove(row_widgets_to_remove)
         self.current_material_row_idx -= 1
 
-        for r_idx in range(row_idx_in_grid, self.current_material_row_idx + 1):
-            for c_idx in range(self.material_grid_layout.columnCount()):
+        for r_idx in range(row_idx_in_grid, self.current_material_row_idx):
+            c_idx = 0
+            while c_idx < self.material_grid_layout.columnCount():
                 item = self.material_grid_layout.itemAtPosition(r_idx + 1, c_idx)
                 if item:
+                    # Ritik: Safely get rowSpan and columnSpan (may not exist on all item types)
+                    try:
+                        row_span = item.rowSpan()
+                        col_span = item.columnSpan()
+                    except AttributeError:
+                        row_span = 1
+                        col_span = 1
+                    
+                    alignment = Qt.Alignment()
+                    if c_idx == 6:
+                        alignment = Qt.AlignCenter
+                    
                     if item.widget():
                         widget = item.widget()
                         self.material_grid_layout.removeWidget(widget)
-                        if c_idx == 6:
-                            self.material_grid_layout.addWidget(widget, r_idx, c_idx, alignment=Qt.AlignCenter)
-                        elif c_idx == 0:
-                             # Re-add Type at col 0 with span 2
-                             self.material_grid_layout.addWidget(widget, r_idx, 0, 1, 2)
-                        else:
-                            self.material_grid_layout.addWidget(widget, r_idx, c_idx)
+                        self.material_grid_layout.addWidget(widget, r_idx, c_idx, row_span, col_span, alignment)
                     elif item.layout():
                         layout = item.layout()
                         self.material_grid_layout.removeItem(layout)
-                        self.material_grid_layout.addLayout(layout, r_idx, c_idx)
+                        self.material_grid_layout.addLayout(layout, r_idx, c_idx, row_span, col_span)
+                    
+                    c_idx += col_span
+                else:
+                    old_item = self.material_grid_layout.itemAtPosition(r_idx, c_idx)
+                    if old_item:
+                        if old_item.widget():
+                            old_item.widget().deleteLater()
+                        self.material_grid_layout.removeItem(old_item)
+                    c_idx += 1
 
         self.updateGeometry()
         self.update()
         self.material_grid_layout.invalidate()
         self.adjustSize()
         self._on_value_changed()
+    
 
 class Foundation(QWidget):
     closed = Signal()
@@ -1541,3 +1567,199 @@ class Foundation(QWidget):
     def close_widget(self):
         self.closed.emit()
         self.setParent(None)
+    
+    #Ritik - START: Improved Excel Data Mapping for Foundation Widget
+    def load_from_excel_sections(self, sections_data):
+        """
+        Load parsed Excel data sections into the Foundation widget.
+        
+        Data is grouped by component type - all materials for the same component
+        are displayed under one component widget.
+        
+        Expected sections_data structure:
+        [
+            {
+                'sheetName': 'Foundation',
+                'type': 'Excavation',  # Component name
+                'data': [
+                    {
+                        'name': 'Material Name',           # Material type/name
+                        'quantity': '100',                 # Quantity in Unit_A
+                        'unit': 'cum',                     # Unit of measurement
+                        'rate': '500.00',                  # Price per unit
+                        'rate_src': 'SOR 2024',            # Rate data source
+                        'carbon_emission': '50.5',         # Carbon emission kgCO2e/Unit_B
+                        'carbon_emission_units': 'kgCO2e', # Carbon units
+                        'conversion_factor': '2.5',        # Unit_A to Unit_B conversion
+                        'carbon_emission_src': 'IPCC',     # Carbon factor source
+                        'recycleable': 'Recyclable'        # Recyclable status
+                    },
+                    ...
+                ]
+            },
+            ...
+        ]
+        """
+        print(f"\n[EXCEL IMPORT] Loading {len(sections_data)} section(s) into Foundation widget")
+
+        # Ritik - START: Remove any existing default components so imported data replaces them
+        # Remove any existing default components so imported data replaces them
+        if getattr(self, 'component_widgets', None):
+            print(f"  [INFO] Clearing {len(self.component_widgets)} existing component(s) before import")
+            while self.component_widgets:
+                # remove_component_layout will handle deletion and layout updates
+                self.remove_component_layout(self.component_widgets[-1])
+        # Ritik - END: Removed default components prior to Excel import
+        
+        # ritik: GROUP DATA BY COMPONENT TYPE
+        # This ensures that if multiple sections have the same component,
+        # all materials are displayed under one component widget
+        component_data_map = {}
+        total_materials = 0
+        
+        for section_idx, section in enumerate(sections_data):
+            component_name = section.get('type', '')
+            rows = section.get('data', [])
+            sheet_name = section.get('sheetName', 'Unknown')
+            
+            if not component_name:
+                print(f"  [SKIP] Section {section_idx}: No component name found")
+                continue
+            
+            print(f"  [SECTION {section_idx}] Sheet: {sheet_name}, Component: {component_name}, Rows: {len(rows)}")
+            
+            # ritik: Group all materials by component name
+            if component_name not in component_data_map:
+                component_data_map[component_name] = []
+                print(f"    ✓ Grouped component: {component_name}")
+            
+            component_data_map[component_name].extend(rows)
+            total_materials += len(rows)
+        
+        print(f"\n  [GROUPING] Total materials: {total_materials}, Total components: {len(component_data_map)}")
+        
+        # ritik: CREATE COMPONENT WIDGETS AND POPULATE WITH GROUPED DATA
+        for component_idx, (component_name, all_rows) in enumerate(component_data_map.items()):
+            print(f"\n  [COMPONENT {component_idx}] {component_name} ({len(all_rows)} materials)")
+            
+            # ritik: Add new component layout
+            self.add_component_layout()
+            new_comp_widget = self.component_widgets[-1]
+            
+            # ritik: Set component dropdown to the component type
+            index = new_comp_widget.component_combobox.findText(component_name, Qt.MatchFixedString)
+            if index >= 0:
+                new_comp_widget.component_combobox.setCurrentIndex(index)
+                print(f"    ✓ Set component dropdown to: {component_name}")
+            else:
+                # If component doesn't exist in dropdown, add it dynamically
+                new_comp_widget.component_combobox.addItem(component_name)
+                new_comp_widget.component_combobox.setCurrentText(component_name)
+                print(f"    ✓ Added new component: {component_name}")
+
+            # ritik: Clear existing placeholder rows
+            # Ritik - COMMENT OUT: clear_rows() has issues with rowSpan, just add materials instead
+            # new_comp_widget.clear_rows()
+            
+            # ritik: Process all materials for this component
+            for row_idx, row_data in enumerate(all_rows):
+                try:
+                    # ritik: Validate and map each field from Excel row
+                    
+                    # Material name/type (REQUIRED)
+                    material_name = str(row_data.get('name', '')).strip()
+                    if not material_name:
+                        print(f"      [WARN] Material {row_idx}: Missing material name, skipping")
+                        continue
+                    
+                    # Quantity - default to 1 if missing/invalid
+                    quantity_val = row_data.get('quantity', '1')
+                    try:
+                        quantity_str = str(float(quantity_val))
+                    except (ValueError, TypeError):
+                        quantity_str = '1'
+                        print(f"      [INFO] Material {row_idx}: Invalid quantity '{quantity_val}', using default '1'")
+                    
+                    # Unit - should match DROPDOWN_UNITS
+                    unit_val = str(row_data.get('unit', '')).lower().strip()
+                    if not unit_val or unit_val == 'none':
+                        unit_val = 'cum'
+                        print(f"      [INFO] Material {row_idx}: No unit specified, using default 'cum'")
+                    
+                    # Rate (price per unit) - default to 0 if missing/invalid
+                    rate_val = row_data.get('rate', '0')
+                    try:
+                        rate_str = str(float(rate_val))
+                    except (ValueError, TypeError):
+                        rate_str = '0'
+                        print(f"      [INFO] Material {row_idx}: Invalid rate '{rate_val}', using default '0'")
+                    
+                    # Rate source
+                    rate_source = str(row_data.get('rate_src', 'Excel Import')).strip()
+                    if not rate_source:
+                        rate_source = 'Excel Import'
+                    
+                    # Carbon emission (optional)
+                    carbon_emission_val = row_data.get('carbon_emission', 'not_available')
+                    if carbon_emission_val is None:
+                        carbon_emission_str = 'not_available'
+                    else:
+                        carbon_emission_str = str(carbon_emission_val).strip()
+                        if not carbon_emission_str or carbon_emission_str.lower() in ['na', 'not available', 'not_available', 'none']:
+                            carbon_emission_str = 'not_available'
+                    
+                    # Carbon emission units
+                    carbon_units = str(row_data.get('carbon_emission_units', 'kgCO2e')).strip()
+                    if not carbon_units:
+                        carbon_units = 'kgCO2e'
+                    
+                    # Conversion factor
+                    conversion_factor_val = row_data.get('conversion_factor', 'not_available')
+                    if conversion_factor_val is None:
+                        conversion_factor_str = 'not_available'
+                    else:
+                        conversion_factor_str = str(conversion_factor_val).strip()
+                        if not conversion_factor_str or conversion_factor_str.lower() in ['na', 'not available', 'not_available', 'none']:
+                            conversion_factor_str = 'not_available'
+                    
+                    # Carbon source
+                    carbon_source = str(row_data.get('carbon_emission_src', '')).strip()
+                    
+                    # Recyclable status
+                    recycleable_val = row_data.get('recycleable', 'Non-recyclable')
+                    recycleable_str = str(recycleable_val).strip() if recycleable_val else 'Non-recyclable'
+                    is_recyclable = recycleable_str.lower() in ['recyclable', 'recycleable', 'yes', 'true']
+                    
+                    # ritik: Create mapped data structure
+                    mapped_data = {
+                        KEY_TYPE: material_name,
+                        KEY_QUANTITY: quantity_str,
+                        KEY_UNIT_M3: unit_val,
+                        KEY_RATE: rate_str,
+                        KEY_RATE_DATA_SOURCE: rate_source,
+                        "carbon_emission": carbon_emission_str,
+                        "carbon_unit": carbon_units,
+                        "conversion_factor": conversion_factor_str,
+                        "carbon_source": carbon_source,
+                        "recyclable": is_recyclable,
+                        "save_to_db": False,
+                        "is_custom": True
+                    }
+                    
+                    # ritik: Add material row to the component widget
+                    if hasattr(new_comp_widget, 'add_custom_material_row'):
+                        new_comp_widget.add_custom_material_row(mapped_data)
+                        print(f"      ✓ Material {row_idx}: {material_name} | {quantity_str} {unit_val} @ {rate_source}")
+                    else:
+                        new_comp_widget.add_material_row(mapped_data)
+                        print(f"      ✓ Material {row_idx}: {material_name} | {quantity_str} {unit_val}")
+                        
+                except Exception as e:
+                    print(f"      [ERROR] Material {row_idx}: Failed to process - {str(e)}")
+                    continue
+        
+        # ritik: Mark state as changed to indicate unsaved data
+        self.mark_state_changed()
+        print(f"\n[EXCEL IMPORT] ✓ Complete. All data grouped by components and loaded.\n")
+
+    #Ritik - END: Improved Excel Data Mapping for Foundation Widget
