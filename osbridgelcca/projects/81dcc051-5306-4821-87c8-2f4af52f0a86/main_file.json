@@ -1,0 +1,25 @@
+{
+    "general_info": {
+        "project_id": "81dcc051-5306-4821-87c8-2f4af52f0a86",
+        "project_name": "FDLA",
+        "company_name": "FHDKJA",
+        "description": "FHDJKA",
+        "valuer": "HDJK",
+        "job_number": "HDJKA",
+        "client": "FDJKLA",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-05T20:04:25.475284",
+        "modified_on": "2026-02-05T20:04:25.475284",
+        "version": 1
+    },
+    "input_param": {},
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

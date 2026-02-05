@@ -1,6 +1,3 @@
-
-
-
 from PySide6.QtWidgets import QApplication, QMainWindow
 from PySide6.QtCore import QCoreApplication, Qt, QSize, QPropertyAnimation, QEasingCurve, Signal
 from PySide6.QtWidgets import (QHBoxLayout, QPushButton, QTextEdit, QWidget, QLabel, QVBoxLayout, QScrollArea, QSpacerItem, QSizePolicy)
@@ -362,9 +359,9 @@ class ProjectDetailsLeft(QWidget):
         self.current_selected_button = button_clicked
     
     def update_button_icon(self, button):
-        """
-        Updates the icon of a category button based on its selected and expanded state.
-        """
+    
+      ##  Updates the icon of a category button based on its selected and expanded state.
+    
         if button.property("class") != "category_button":
             return
         is_selected = button.property("selected")
@@ -386,3 +383,4 @@ class ProjectDetailsLeft(QWidget):
     def close_widget(self):
         self.closed.emit()
         self.setParent(None)
+

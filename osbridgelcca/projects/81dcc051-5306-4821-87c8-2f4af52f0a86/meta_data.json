@@ -1,0 +1,13 @@
+{
+    "id": "81dcc051-5306-4821-87c8-2f4af52f0a86",
+    "name": "FDLA",
+    "status": "draft",
+    "user_name": "root",
+    "sys_info": {
+        "os": "Darwin",
+        "architecture": "arm64",
+        "app_version": "1.0.0"
+    },
+    "created_on": "2026-02-05T20:04:25.475284",
+    "version": 1
+}

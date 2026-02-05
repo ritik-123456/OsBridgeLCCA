@@ -23,9 +23,7 @@ except ImportError:
 
 class ProjectDetailsWidget(QWidget):
     closed = Signal()
-    # JAWWAD : This signal is CRITICAL. It carries the UUID to the Main Window, 
-    # which then passes it to the Foundation widget to enable real-time autosaving.
-    projectCreated = Signal(str)  
+    projectCreated = Signal(str)  # Signal emitted when project is successfully created
 
     # Country to Currency Mapping
     COUNTRY_CURRENCY_MAP = {
@@ -52,7 +50,6 @@ class ProjectDetailsWidget(QWidget):
         # Initialize Backend Logic
         if ProjectCreator:
             self.creator = ProjectCreator()
-            # JAWWAD : Connect backend signals to UI slots
             self.creator.projectCreated.connect(self.on_creation_success)
             self.creator.errorOccurred.connect(self.on_creation_error)
         else:
@@ -723,11 +720,11 @@ class ProjectDetailsWidget(QWidget):
         # JAWWAD: Enable Input and Output parameters now
         self.enable_project_features()
         
-        # JAWWAD : Emit the signal with the new Project UUID
-        # This is where the generated ID is broadcasted to the application
         self.projectCreated.emit(uuid)
         
-        print(f"DEBUG : Signal 'projectCreated' emitted with UUID: {uuid}")
+        # JAWWAD: DEBUG INFO
+        # This confirms emission. Ensure your MainWindow connects this signal to Foundation.set_project_id()!
+        print(f"JAWWAD DEBUG: Signal 'projectCreated' emitted with UUID: {uuid}")
 
     @Slot(str)
     def on_creation_error(self, msg):
