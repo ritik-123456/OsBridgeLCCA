@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=production
+
+  frontend:
+    build: ./web_app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

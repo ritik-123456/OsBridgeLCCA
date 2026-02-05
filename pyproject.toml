@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "osbridgelcca"
+version = "0.1.0"
+description = "Life Cycle Cost Analysis for Bridges"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+license = {text = "MIT"}
+dependencies = [
+    "django",
+    "djangorestframework",
+    "pyqt5",
+    "plotly",
+    "pylatex",
+    "pytest",
+    "matplotlib",
+    "pandas",
+    "numpy",
+    "psycopg2-binary",
+    "requests",
+    "flask",
+    "gunicorn",
+]
+
+[tool.setuptools]
+packages = ["osbridgelcca"]
+package-dir = {"" = "src"}
+
+[tool.setuptools.package-data]
+"osbridgelcca" = ["databases/*.db", "resources/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

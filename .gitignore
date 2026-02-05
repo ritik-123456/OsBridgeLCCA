@@ -1,0 +1,87 @@
+# Byte-compiled / Virtual Environment
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.dll
+*.dylib
+*.o
+*.out
+*.a
+
+# Virtual Environment
+env/
+venv/
+.venv/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Logs and Debugging
+logs/
+*.log
+app_crash.log
+
+# Database files
+data/databases/*.db
+data/databases/*.sqlite3
+
+# Flask and Django
+instance/
+*.sqlite
+*.db
+*.sqlite3
+
+# PyQt UI files
+*.pyc
+*.qrc
+*.qss~
+
+# Web Frontend (React, Node.js)
+web_app/node_modules/
+web_app/build/
+web_app/.eslintcache
+web_app/.turbo/
+web_app/.next/
+
+# VS Code settings
+.vscode/
+*.code-workspace
+
+# PyCharm settings
+.idea/
+
+# Dependencies
+requirements.txt
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Compiled LaTeX files
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.run.xml
+*.pdf_tex
+docs/*.pdf
+
+# Coverage and Testing
+.coverage
+htmlcov/
+tests/__pycache__/
+
+# Docker
+docker-compose.override.yml
+
+# GitHub Actions
+cicd/github_actions/*.log
+
+# Misc
+.DS_Store
+Thumbs.db
