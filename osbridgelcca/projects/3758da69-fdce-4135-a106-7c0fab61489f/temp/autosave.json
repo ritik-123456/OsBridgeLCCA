@@ -1,0 +1,62 @@
+{
+    "general_info": {
+        "project_id": "3758da69-fdce-4135-a106-7c0fab61489f",
+        "project_name": "fdjkla",
+        "company_name": "dkl;s",
+        "description": "fjdlakdj",
+        "valuer": "dfjkd",
+        "job_number": "3989",
+        "client": "jdfka",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-04T21:49:33.063645",
+        "modified_on": "2026-02-04T21:49:33.063645",
+        "version": 1
+    },
+    "input_param": {
+        "construction_work_data": {
+            "foundation_excavation": {
+                "items": [
+                    {
+                        "id": "330a5b04-1913-4861-b12a-6084993d5f97",
+                        "values": {
+                            "carbon_emission": "not_available",
+                            "carbon_source": "not_available",
+                            "carbon_unit": "not_available",
+                            "conversion_factor": "not_available",
+                            "grade": "Standard",
+                            "is_custom": false,
+                            "quantity": "392",
+                            "rate": "241",
+                            "rate_data_source": "Maha PWD SOR",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": false,
+                            "scrap_rate": "",
+                            "type": "Hard Murrum (0 to 1.5m)",
+                            "unit_m3": "cum"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T21:49:45.642255",
+                            "is_active": true
+                        }
+                    }
+                ]
+            },
+            "foundation_pile": {
+                "items": []
+            },
+            "sub_structure_pier": {
+                "items": []
+            }
+        }
+    },
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

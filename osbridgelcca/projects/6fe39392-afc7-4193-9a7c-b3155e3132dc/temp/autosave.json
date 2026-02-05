@@ -1,0 +1,84 @@
+{
+    "general_info": {
+        "project_id": "6fe39392-afc7-4193-9a7c-b3155e3132dc",
+        "project_name": "fjdkla",
+        "company_name": "dkla",
+        "description": "hfdks",
+        "valuer": "fdad",
+        "job_number": "456",
+        "client": "zcda",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2025",
+        "currency": "INR",
+        "created_on": "2026-02-04T22:19:23.082079",
+        "modified_on": "2026-02-04T22:19:23.082079",
+        "version": 1
+    },
+    "input_param": {
+        "construction_work_data": {
+            "foundation": {
+                "items": [
+                    {
+                        "id": "d682b9c8-adee-445d-900f-7312f46e842a",
+                        "values": {
+                            "carbon_emission": "not_available",
+                            "carbon_source": "not_available",
+                            "carbon_unit": "not_available",
+                            "conversion_factor": "not_available",
+                            "grade": "Standard",
+                            "is_custom": false,
+                            "quantity": "345",
+                            "rate": "99",
+                            "rate_data_source": "Maha PWD SOR",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": false,
+                            "scrap_rate": "",
+                            "type": "All type(Mechanical) (1.5 to 3.0m)",
+                            "unit_m3": "cum"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T22:19:42.400164",
+                            "is_active": true
+                        }
+                    }
+                ]
+            },
+            "super_structure": {
+                "items": [
+                    {
+                        "id": "4c131f4e-6c8d-47a2-ac4d-307c14826d62",
+                        "values": {
+                            "carbon_emission": "0.11",
+                            "carbon_source": "fjdksa",
+                            "carbon_unit": "kgCO\u2082e/kg",
+                            "conversion_factor": "2400",
+                            "grade": "Standard",
+                            "is_custom": false,
+                            "quantity": "893",
+                            "rate": "14802",
+                            "rate_data_source": "woow",
+                            "recyclable": true,
+                            "recycle_percentage": "29",
+                            "save_to_db": false,
+                            "scrap_rate": "789",
+                            "type": "Concreting in PSC Girder (M40) (12.5 to 15m)",
+                            "unit_m3": "cum"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T22:22:18.381918",
+                            "is_active": true
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

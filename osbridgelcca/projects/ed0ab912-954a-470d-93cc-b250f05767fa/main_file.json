@@ -1,0 +1,25 @@
+{
+    "general_info": {
+        "project_id": "ed0ab912-954a-470d-93cc-b250f05767fa",
+        "project_name": "fdklad",
+        "company_name": "fjdlad",
+        "description": "fdjka",
+        "valuer": "dlkda",
+        "job_number": "329",
+        "client": "djfdk",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-04T21:44:37.520818",
+        "modified_on": "2026-02-04T21:44:37.520818",
+        "version": 1
+    },
+    "input_param": {},
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

@@ -1,0 +1,25 @@
+{
+    "general_info": {
+        "project_id": "c76dc159-e91c-4328-a024-bc4c8521152c",
+        "project_name": "fdjhak",
+        "company_name": "lhdkak",
+        "description": "fhdka",
+        "valuer": "fdhkad",
+        "job_number": "479",
+        "client": "fdja",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2016",
+        "currency": "INR",
+        "created_on": "2026-02-02T20:36:50.728848",
+        "modified_on": "2026-02-02T20:36:50.728848",
+        "version": 1
+    },
+    "input_param": {},
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

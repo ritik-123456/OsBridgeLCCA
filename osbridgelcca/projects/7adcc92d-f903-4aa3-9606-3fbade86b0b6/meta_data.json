@@ -1,0 +1,13 @@
+{
+    "id": "7adcc92d-f903-4aa3-9606-3fbade86b0b6",
+    "name": "dhald",
+    "status": "draft",
+    "user_name": "root",
+    "sys_info": {
+        "os": "Darwin",
+        "architecture": "arm64",
+        "app_version": "1.0.0"
+    },
+    "created_on": "2026-02-04T20:52:13.830994",
+    "version": 1
+}

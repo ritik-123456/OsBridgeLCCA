@@ -1,0 +1,56 @@
+{
+    "general_info": {
+        "project_id": "ed0ab912-954a-470d-93cc-b250f05767fa",
+        "project_name": "fdklad",
+        "company_name": "fjdlad",
+        "description": "fdjka",
+        "valuer": "dlkda",
+        "job_number": "329",
+        "client": "djfdk",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-04T21:44:37.520818",
+        "modified_on": "2026-02-04T21:44:37.520818",
+        "version": 1
+    },
+    "input_param": {
+        "construction_work_data": {
+            "sub_structure_pier": {
+                "items": [
+                    {
+                        "id": "4c4f9d31-e81a-4930-9915-48e65333d609",
+                        "values": {
+                            "carbon_emission": "2.6",
+                            "carbon_source": "IFC",
+                            "carbon_unit": "kgCO\u2082e/kg",
+                            "conversion_factor": "1000",
+                            "grade": "Standard",
+                            "is_custom": false,
+                            "quantity": "9382",
+                            "rate": "88341",
+                            "rate_data_source": "Maha PWD SOR",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": false,
+                            "scrap_rate": "",
+                            "type": "Steel Rebar (Fe500)",
+                            "unit_m3": "MT"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T21:44:55.641911",
+                            "is_active": true
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}
