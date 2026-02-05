@@ -1,0 +1,31 @@
+{
+    "general_info": {
+        "project_id": "1e84d6b5-b079-4234-9752-142c886798b3",
+        "project_name": "JFDSKA",
+        "company_name": "DAIDJ",
+        "description": "FDASND",
+        "valuer": "FHDKLSA",
+        "job_number": "3892",
+        "client": "FDKA",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-02T00:23:10.489192",
+        "modified_on": "2026-02-02T00:23:10.489192",
+        "version": 1
+    },
+    "input_param": {
+        "items": [],
+        "flags": {
+            "enabled": false
+        }
+    },
+    "Financial": {
+        "data": {},
+        "flags": {
+            "enabled": false
+        }
+    }
+}

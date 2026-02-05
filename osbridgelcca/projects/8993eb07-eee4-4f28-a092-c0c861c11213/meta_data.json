@@ -1,0 +1,13 @@
+{
+    "id": "8993eb07-eee4-4f28-a092-c0c861c11213",
+    "name": "fdklad",
+    "status": "draft",
+    "user_name": "root",
+    "sys_info": {
+        "os": "Darwin",
+        "architecture": "arm64",
+        "app_version": "1.0.0"
+    },
+    "created_on": "2026-02-02T00:38:11.818536",
+    "version": 1
+}

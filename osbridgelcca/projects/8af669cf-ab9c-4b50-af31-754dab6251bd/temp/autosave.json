@@ -1,0 +1,104 @@
+{
+    "general_info": {
+        "project_id": "8af669cf-ab9c-4b50-af31-754dab6251bd",
+        "project_name": "daiodoa",
+        "company_name": "shdiaid",
+        "description": "dhakd",
+        "valuer": "hfuewiqiw",
+        "job_number": "3892",
+        "client": "feiqo",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2020",
+        "currency": "INR",
+        "created_on": "2026-02-03T18:47:41.421176",
+        "modified_on": "2026-02-03T18:47:41.421176",
+        "version": 1
+    },
+    "input_param": {
+        "construction_work_data": {
+            "excavation": {
+                "items": [
+                    {
+                        "id": "c2ebaf64-c193-45aa-94d6-fee8b478b560",
+                        "values": {
+                            "carbon_emission": "NA",
+                            "carbon_source": "djal",
+                            "carbon_unit": "ioad",
+                            "conversion_factor": "33",
+                            "grade": "Standard",
+                            "is_custom": true,
+                            "quantity": "789",
+                            "rate": "788",
+                            "rate_data_source": "jkdal",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": false,
+                            "scrap_rate": "",
+                            "type": "soft rock",
+                            "unit_m3": "cum"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-03T18:49:07.863709",
+                            "is_active": true
+                        }
+                    },
+                    {
+                        "id": "0dc04483-f8d7-49db-be26-acd14ccbf348",
+                        "values": {
+                            "carbon_emission": "not_available",
+                            "carbon_source": "not_available",
+                            "carbon_unit": "not_available",
+                            "conversion_factor": "not_available",
+                            "grade": "Standard",
+                            "is_custom": false,
+                            "quantity": "8493",
+                            "rate": "314.6",
+                            "rate_data_source": "Maha PWD SOR",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": false,
+                            "scrap_rate": "",
+                            "type": "Hard Murrum and Boulders (1.5 to 3.0m)",
+                            "unit_m3": "cum"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T15:20:46.372745",
+                            "is_active": true
+                        }
+                    },
+                    {
+                        "id": "a4d7ba64-6b86-4bdc-a39c-70be1252fd06",
+                        "values": {
+                            "carbon_emission": "not_available",
+                            "carbon_source": "not_available",
+                            "carbon_unit": "not_available",
+                            "conversion_factor": "not_available",
+                            "grade": "Standard",
+                            "is_custom": true,
+                            "quantity": "8392",
+                            "rate": "99",
+                            "rate_data_source": "Maha PWD SOR",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": true,
+                            "scrap_rate": "",
+                            "type": "dsoaj",
+                            "unit_m3": "cum"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T15:21:39.033780",
+                            "is_active": true
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

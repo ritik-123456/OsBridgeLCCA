@@ -1,0 +1,56 @@
+{
+    "general_info": {
+        "project_id": "e833aeae-7c16-4cbb-a008-2ebebb38dc0a",
+        "project_name": "FKDJKS",
+        "company_name": "JFKLSD",
+        "description": "fdka",
+        "valuer": "fjkdla",
+        "job_number": "37",
+        "client": "dsjla",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-04T20:44:05.797213",
+        "modified_on": "2026-02-04T20:44:05.797213",
+        "version": 1
+    },
+    "input_param": {
+        "construction_work_data": {
+            "pier": {
+                "items": [
+                    {
+                        "id": "7ee6982f-0534-4962-9646-966d60fdd97a",
+                        "values": {
+                            "carbon_emission": "2.6",
+                            "carbon_source": "IFC",
+                            "carbon_unit": "kgCO\u2082e/kg",
+                            "conversion_factor": "1000",
+                            "grade": "Standard",
+                            "is_custom": false,
+                            "quantity": "87",
+                            "rate": "88341",
+                            "rate_data_source": "Maha PWD SOR",
+                            "recyclable": false,
+                            "recycle_percentage": "",
+                            "save_to_db": false,
+                            "scrap_rate": "",
+                            "type": "Steel Rebar (Fe500)",
+                            "unit_m3": "MT"
+                        },
+                        "meta": {
+                            "created_on": "2026-02-04T20:44:22.673580",
+                            "is_active": true
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

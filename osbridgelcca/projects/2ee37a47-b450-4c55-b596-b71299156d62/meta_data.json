@@ -1,0 +1,13 @@
+{
+    "id": "2ee37a47-b450-4c55-b596-b71299156d62",
+    "name": "dfkda",
+    "status": "draft",
+    "user_name": "root",
+    "sys_info": {
+        "os": "Darwin",
+        "architecture": "arm64",
+        "app_version": "1.0.0"
+    },
+    "created_on": "2026-02-04T17:13:34.883632",
+    "version": 1
+}

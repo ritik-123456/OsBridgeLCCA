@@ -1,0 +1,25 @@
+{
+    "general_info": {
+        "project_id": "3758da69-fdce-4135-a106-7c0fab61489f",
+        "project_name": "fdjkla",
+        "company_name": "dkl;s",
+        "description": "fjdlakdj",
+        "valuer": "dfjkd",
+        "job_number": "3989",
+        "client": "jdfka",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-04T21:49:33.063645",
+        "modified_on": "2026-02-04T21:49:33.063645",
+        "version": 1
+    },
+    "input_param": {},
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}

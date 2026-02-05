@@ -1,0 +1,25 @@
+{
+    "general_info": {
+        "project_id": "1cc5eec6-1694-43cf-9113-aac543f0f7c1",
+        "project_name": "fheow",
+        "company_name": "djadl",
+        "description": "feoiw",
+        "valuer": "hdalkd",
+        "job_number": "932",
+        "client": "djajd",
+        "country": "India",
+        "region": "India",
+        "sor": "Bihar",
+        "base_year": "2024",
+        "currency": "INR",
+        "created_on": "2026-02-04T21:07:55.977423",
+        "modified_on": "2026-02-04T21:07:55.977423",
+        "version": 1
+    },
+    "input_param": {},
+    "Financial": {},
+    "Maintenace_repair": {},
+    "Carbon_emission": {},
+    "Bridge_and_traffic": {},
+    "Demolition_and_recycling": {}
+}
