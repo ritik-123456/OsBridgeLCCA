@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QApplication, QMainWindow
-from PySide6.QtCore import QCoreApplication, QSize, Qt, QPropertyAnimation, QEasingCurve, Signal
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox
+from PySide6.QtCore import QCoreApplication, QSize, Qt, QPropertyAnimation, QEasingCurve, Signal, Slot
 from PySide6.QtGui import (QIcon)
 from PySide6.QtWidgets import (QHBoxLayout, QTextEdit, QScrollArea, QSpacerItem, QSizePolicy,
     QPushButton, QWidget, QLabel, QVBoxLayout, QGridLayout, QLineEdit, QComboBox)
@@ -7,10 +7,54 @@ from osbridgelcca.desktop_app.widgets.utils.data import *
 from osbridgelcca.desktop_app.resources.resources_rc import *
 import sys
 
+# Import Backend Logic
+try:
+    from osbridgelcca.desktop_app.core.project_creator import ProjectCreator
+except ImportError:
+    print("Warning: ProjectCreator backend not found.")
+    ProjectCreator = None
+
+# JAWWAD : Added import for sor_backend to handle dynamic Region and SOR logic
+try:
+    from osbridgelcca.desktop_app.widgets.utils.sor_backend import sor_manager
+except ImportError:
+    print("Warning: sor_backend.py not found. Search features will be limited.")
+    sor_manager = None
+
 class ProjectDetailsWidget(QWidget):
     closed = Signal()
+    projectCreated = Signal(str)  # Signal emitted when project is successfully created
+
+    # Country to Currency Mapping
+    COUNTRY_CURRENCY_MAP = {
+        "India": "INR", "United States of America": "USD", "United Kingdom": "GBP",
+        "Germany": "EUR", "France": "EUR", "Italy": "EUR", "Spain": "EUR", "Netherlands": "EUR",
+        "Australia": "AUD", "Canada": "CAD", "Japan": "JPY", "China": "CNY",
+        "Russia": "RUB", "Brazil": "BRL", "South Africa": "ZAR", "Saudi Arabia": "SAR",
+        "United Arab Emirates": "AED", "Singapore": "SGD", "Switzerland": "CHF",
+        "Afghanistan": "AFN", "Bangladesh": "BDT", "Pakistan": "PKR", "Sri Lanka": "LKR",
+        "Nepal": "NPR", "Bhutan": "BTN", "Maldives": "MVR", "Kuwait": "KWD",
+        "Qatar": "QAR", "Oman": "OMR", "Bahrain": "BHD", "Turkey": "TRY",
+        "Thailand": "THB", "Vietnam": "VND", "Indonesia": "IDR", "Malaysia": "MYR",
+        "Philippines": "PHP", "South Korea": "KRW", "North Korea": "KPW",
+        "Egypt": "EGP", "Nigeria": "NGN", "Kenya": "KES", "Mexico": "MXN",
+        "Argentina": "ARS", "Chile": "CLP", "Colombia": "COP", "Peru": "PEN",
+        "New Zealand": "NZD", "Sweden": "SEK", "Norway": "NOK", "Denmark": "DKK",
+        "Poland": "PLN", "Hungary": "HUF", "Czechia (Czech Republic)": "CZK",
+        "Romania": "RON", "Bulgaria": "BGN", "Ukraine": "UAH", "Israel": "ILS"
+    }
+
     def __init__(self, parent=None):
         super().__init__()
+        
+        # Initialize Backend Logic
+        if ProjectCreator:
+            self.creator = ProjectCreator()
+            self.creator.projectCreated.connect(self.on_creation_success)
+            self.creator.errorOccurred.connect(self.on_creation_error)
+        else:
+            self.creator = None
+
         self.setObjectName("central_panel_widget")
         self.setStyleSheet("""
            #central_panel_widget {
@@ -117,6 +161,17 @@ class ProjectDetailsWidget(QWidget):
             QPushButton#top_button_right_panel:hover QIcon {
                 color: red;
             }
+            /* Create Button Style */
+            QPushButton#create_btn {
+                background-color: #2E8B57; 
+                color: white; 
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 6px;
+                font-size: 13px;
+            }
+            QPushButton#create_btn:hover { background-color: #3CB371; }
+            QPushButton#create_btn:disabled { background-color: #A0A0A0; }
         """)
         left_panel_vlayout = QVBoxLayout(self)
         left_panel_vlayout.setContentsMargins(0, 0, 0, 0)
@@ -196,71 +251,89 @@ class ProjectDetailsWidget(QWidget):
         label.setObjectName("left_label")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 0, 0, 1, 1)
-        input_widget = QLineEdit(self.general_widget)
-        grid_layout.addWidget(input_widget, 0, 1, 1, 2)
+        self.company_name = QLineEdit(self.general_widget)
+        grid_layout.addWidget(self.company_name, 0, 1, 1, 2)
         
         # Project Title
         label = QLabel("Project Title *")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 1, 0, 1, 1)
-        input_widget = QLineEdit(self.general_widget)
-        grid_layout.addWidget(input_widget, 1, 1, 1, 2)
+        self.project_title = QLineEdit(self.general_widget)
+        grid_layout.addWidget(self.project_title, 1, 1, 1, 2)
         
         # Project Description
         label = QLabel("Project Description")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 2, 0, 1, 1)
-        input_widget = QTextEdit(self.general_widget)
-        input_widget.setPlaceholderText("Enter project description here...")
-        grid_layout.addWidget(input_widget, 2, 1, 1, 2)
+        self.description = QTextEdit(self.general_widget)
+        self.description.setPlaceholderText("Enter project description here...")
+        grid_layout.addWidget(self.description, 2, 1, 1, 2)
         
         # Name of Valuer
         label = QLabel("Name of Valuer *")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 3, 0, 1, 1)
-        input_widget = QLineEdit(self.general_widget)
-        input_widget.setStyleSheet("""
+        self.valuer_name = QLineEdit(self.general_widget)
+        self.valuer_name.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #DDDCE0;
                 border-radius: 10px;
                 padding: 3px 10px;
             }
         """)
-        grid_layout.addWidget(input_widget, 3, 1, 1, 1)
+        grid_layout.addWidget(self.valuer_name, 3, 1, 1, 1)
         
         # Job Number
         label = QLabel("Job Number *")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 4, 0, 1, 1)
-        input_widget = QLineEdit(self.general_widget)
-        input_widget.setStyleSheet("""
+        self.job_number = QLineEdit(self.general_widget)
+        self.job_number.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #DDDCE0;
                 border-radius: 10px;
                 padding: 3px 10px;
             }
         """)
-        grid_layout.addWidget(input_widget, 4, 1, 1, 1)
+        grid_layout.addWidget(self.job_number, 4, 1, 1, 1)
         
         # Client
         label = QLabel("Client *")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 5, 0, 1, 1)
-        input_widget = QLineEdit(self.general_widget)
-        input_widget.setStyleSheet("""
+        self.client_name = QLineEdit(self.general_widget)
+        self.client_name.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #DDDCE0;
                 border-radius: 10px;
                 padding: 3px 10px;
             }
         """)
-        grid_layout.addWidget(input_widget, 5, 1, 1, 1)
+        grid_layout.addWidget(self.client_name, 5, 1, 1, 1)
+        
+        # --- FEATURE ADDITION: Currency Input (Moved UP to avoid AttributeError) ---
+        # NOTE: We define this BEFORE the Country ComboBox logic so it exists when the signal fires.
+        currency_label = QLabel("Currency *")
+        currency_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # We will add it to the grid at row 7 later, but defining it here is key.
+        
+        self.currency_input = QLineEdit(self.general_widget)
+        self.currency_input.setReadOnly(True)  # Auto-filled based on country
+        self.currency_input.setStyleSheet("""
+            QLineEdit {
+                border: 1px solid #DDDCE0;
+                border-radius: 10px;
+                padding: 3px 10px;
+                background-color: #F2F2F2; /* Slightly grey to indicate read-only */
+                color: #555555;
+            }
+        """)
         
         # Country ComboBox
         label = QLabel("Country *")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         grid_layout.addWidget(label, 6, 0, 1, 1)
-        valuer_combo = QComboBox(self.general_widget)
+        self.country_combo = QComboBox(self.general_widget)
         
         # Comprehensive list of countries
         countries = [
@@ -289,9 +362,10 @@ class ProjectDetailsWidget(QWidget):
             "Yemen",
             "Zambia", "Zimbabwe"
         ]
-        valuer_combo.addItems(countries)
+        self.country_combo.addItems(countries)
         
-        valuer_combo.setStyleSheet("""
+        # Stylesheet for Dropdowns (reused for Region and SOR)
+        combo_style = """
             QComboBox{
                 border: 1px solid #DDDCE0;
                 border-radius: 10px;
@@ -319,13 +393,20 @@ class ProjectDetailsWidget(QWidget):
             QComboBox QAbstractItemView::item:hover {
                 background-color: #FDEFEF;
             }
-        """)
+        """
+        
+        self.country_combo.setStyleSheet(combo_style)
+        
+        # Connect Country change to slot for currency update
+        # Now safe because self.currency_input exists
+        self.country_combo.currentTextChanged.connect(self.on_country_changed)
+        
         # Set default to India if in list, otherwise first item
-        index = valuer_combo.findText("India")
+        index = self.country_combo.findText("India")
         if index >= 0:
-            valuer_combo.setCurrentIndex(index)
+            self.country_combo.setCurrentIndex(index)
             
-        grid_layout.addWidget(valuer_combo, 6, 1, 1, 1)
+        grid_layout.addWidget(self.country_combo, 6, 1, 1, 1)
         info_icon = QLabel("ⓘ")
         info_icon.setStyleSheet("color: grey; font-size: 14px;")
         info_icon.setObjectName("info_button")
@@ -333,20 +414,89 @@ class ProjectDetailsWidget(QWidget):
         info_icon.setCursor(Qt.PointingHandCursor)
         info_icon.setAlignment(Qt.AlignRight)
         grid_layout.addWidget(info_icon, 6, 2, 1, 1)
+
+        # -----------------------------------------------------------
+        # ADD Currency Widget to Grid (Row 7)
+        # -----------------------------------------------------------
+        grid_layout.addWidget(currency_label, 7, 0, 1, 1)
+        grid_layout.addWidget(self.currency_input, 7, 1, 1, 1)
         
-        # Base Year
+        # Initialize currency based on default country
+        self.on_country_changed(self.country_combo.currentText())
+
+        # -----------------------------------------------------------
+        # JAWWAD : START: Region and SOR Logic Frontend with Backend Integration
+        # -----------------------------------------------------------
+        
+        # JAWWAD : 1. Region Dropdown (Shifted to Row 8)
+        region_label = QLabel("Region *")
+        region_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        grid_layout.addWidget(region_label, 8, 0, 1, 1)
+        
+        self.region_combo = QComboBox(self.general_widget)
+        self.region_combo.setStyleSheet(combo_style)
+        
+        # JAWWAD : Populate region combo from backend if available
+        if sor_manager:
+            self.region_combo.addItems(sor_manager.get_regions())
+            # Connect registry update signal
+            sor_manager.registry_updated.connect(self.refresh_ui_options)
+        else:
+            # Fallback
+            self.region_combo.addItems(["India", "USA"])
+            
+        # JAWWAD : Connect Region change to slot
+        self.region_combo.currentTextChanged.connect(self.on_region_changed)
+        grid_layout.addWidget(self.region_combo, 8, 1, 1, 1)
+
+        # JAWWAD : 2. Selected SOR Dropdown (Shifted to Row 9)
+        sor_label = QLabel("Selected SOR *")
+        sor_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        grid_layout.addWidget(sor_label, 9, 0, 1, 1)
+        
+        self.sor_combo = QComboBox(self.general_widget)
+        self.sor_combo.setStyleSheet(combo_style)
+        
+        # JAWWAD : Connect SOR change to slot
+        self.sor_combo.currentTextChanged.connect(self.on_sor_changed)
+        
+        # JAWWAD : Trigger initial population of SOR based on default region
+        self.on_region_changed(self.region_combo.currentText())
+        
+        grid_layout.addWidget(self.sor_combo, 9, 1, 1, 1)
+
+        # -----------------------------------------------------------
+        # JAWWAD : END Region and SOR Logic
+        # -----------------------------------------------------------
+        
+        # Base Year (Shifted to Row 10)
         label = QLabel("Base Year *")
         label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        grid_layout.addWidget(label, 7, 0, 1, 1)
-        input_widget = QLineEdit(self.general_widget)
-        input_widget.setStyleSheet("""
+        grid_layout.addWidget(label, 10, 0, 1, 1) 
+        self.base_year = QLineEdit(self.general_widget)
+        self.base_year.setStyleSheet("""
             QLineEdit {
                 border: 1px solid #DDDCE0;
                 border-radius: 10px;
                 padding: 3px 10px;
             }
         """)
-        grid_layout.addWidget(input_widget, 7, 1, 1, 1)
+        grid_layout.addWidget(self.base_year, 10, 1, 1, 1)
+
+        # --- CREATE PROJECT BUTTON (Shifted to Row 11) ---
+        self.create_btn = QPushButton("Create Project")
+        self.create_btn.setObjectName("create_btn")
+        self.create_btn.setCursor(Qt.PointingHandCursor)
+        self.create_btn.clicked.connect(self.on_create_clicked)
+        
+        # Add a container layout for the button to align it right or stretch
+        btn_container = QHBoxLayout()
+        btn_container.addStretch()
+        btn_container.addWidget(self.create_btn)
+        
+        # Add to grid at Row 11, spanning 2 columns
+        grid_layout.addLayout(btn_container, 11, 1, 1, 2)
+
         scroll_content_layout.insertWidget(1, self.general_widget)
         self.general_widget.show()
         self.general_widget.adjustSize()
@@ -361,6 +511,8 @@ class ProjectDetailsWidget(QWidget):
         # Input Parameters Section
         self.input_param_unactive_icon = QIcon(":/images/play_button_unselected.png")
         self.input_param_active_icon = QIcon(":/images/arrow_down.png")
+        
+        # JAWWAD: Define styles for enabled/disabled states
         self.input_param_button_css_inactive = """
             QPushButton#parameter_button {
               background-color: transparent;
@@ -396,6 +548,18 @@ class ProjectDetailsWidget(QWidget):
                 background-color: #FFF3F3;
             }
         """
+        # JAWWAD: New disabled style
+        self.input_param_button_css_disabled = """
+            QPushButton#parameter_button {
+                background-color: #E0E0E0;
+                border: 1px solid #B0B0B0;
+                text-align: left;
+                padding: 3px 10px;
+                color: #808080;
+                font-size: 16px;
+            }
+        """
+
         self.input_param_widget = QWidget()
         self.input_param_widget.setObjectName("input_param_widget")
         self.input_param_widget.setStyleSheet("""
@@ -407,14 +571,18 @@ class ProjectDetailsWidget(QWidget):
         self.input_param_layout = QVBoxLayout(self.input_param_widget)
         self.input_param_layout.setContentsMargins(0, 0, 0, 0)
         self.input_param_layout.setSpacing(0)
+        
         self.input_param_button = QPushButton("   Input Parameters")
-        self.input_param_button.setStyleSheet(self.input_param_button_css_inactive)
+        # JAWWAD: Disable by default
+        self.input_param_button.setEnabled(False)
+        self.input_param_button.setStyleSheet(self.input_param_button_css_disabled)
         self.input_param_button.setObjectName("parameter_button")
-        self.input_param_button.setCursor(Qt.PointingHandCursor)
+        self.input_param_button.setCursor(Qt.ForbiddenCursor) # Changed to Forbidden
         self.input_param_button.clicked.connect(self.input_button_toggle)
         self.input_param_button.setIcon(self.input_param_unactive_icon)
         self.input_param_button.setIconSize(QSize(10, 10))
         self.input_param_button.setLayoutDirection(Qt.LeftToRight)
+        
         self.input_param_layout.addWidget(self.input_param_button)
         self.input_param_option_widget = QWidget()
         self.input_param_option_widget.hide()
@@ -465,11 +633,27 @@ class ProjectDetailsWidget(QWidget):
             self.param_buttons.append(btn)
         self.input_param_layout.addWidget(self.input_param_option_widget)
         scroll_content_layout.insertWidget(2, self.input_param_widget)
+        
         self.output_button = QPushButton("   Outputs")
         self.output_button.setObjectName("output_button")
         self.output_button.setIcon(QIcon(":/images/play_button_unselected.png"))
         self.output_button.setIconSize(QSize(10, 10))
         self.output_button.setLayoutDirection(Qt.LeftToRight)
+        
+        # JAWWAD: Disable by default
+        self.output_button.setEnabled(False)
+        self.output_button.setCursor(Qt.ForbiddenCursor)
+        self.output_button.setStyleSheet("""
+            QPushButton#output_button {
+                background-color: #E0E0E0;
+                border: 1px solid #B0B0B0;
+                text-align: left;
+                padding: 3px 10px;
+                color: #808080;
+                font-size: 14px;
+            }
+        """)
+
         scroll_content_layout.insertWidget(3, self.output_button)
         left_panel_vlayout.addWidget(self.scroll_area)
         self.bottom_widget = QWidget()
@@ -485,10 +669,175 @@ class ProjectDetailsWidget(QWidget):
         left_panel_vlayout.addWidget(self.bottom_widget)
         self.general_info_button.clicked.connect(self.expand_general_area)
 
+    # --- PROJECT CREATION LOGIC ---
+
+    def on_create_clicked(self):
+        """Collects data from form fields and calls backend to create project."""
+        # 1. Validation
+        if not self.company_name.text().strip() or not self.project_title.text().strip():
+            QMessageBox.warning(self, "Required Fields", "Company Name and Project Title are required!")
+            return
+            
+        if not self.base_year.text().strip():
+             QMessageBox.warning(self, "Required Fields", "Base Year is required!")
+             return
+
+        # 2. Gather Data
+        data = {
+            "company_name": self.company_name.text(),
+            "project_title": self.project_title.text(),
+            "description": self.description.toPlainText(),
+            "valuer": self.valuer_name.text(),
+            "job_number": self.job_number.text(),
+            "client": self.client_name.text(),
+            "country": self.country_combo.currentText(),
+            "currency": self.currency_input.text(),  # Dynamic Currency Input
+            "region": self.region_combo.currentText(),
+            "sor": self.sor_combo.currentText(),
+            "base_year": self.base_year.text()
+        }
+
+        # 3. Call Backend
+        self.create_btn.setText("Creating...")
+        self.create_btn.setEnabled(False)
+        
+        if self.creator:
+            self.creator.create_new_project(data)
+        else:
+            # Fallback if backend missing
+            print("Mock Data Submitted:", data)
+            QMessageBox.information(self, "Mock Mode", "Backend not connected. Data printed to console.")
+            self.create_btn.setText("Create Project")
+            self.create_btn.setEnabled(True)
+
+    @Slot(str)
+    def on_creation_success(self, uuid):
+        self.create_btn.setText("Success!")
+        self.create_btn.setEnabled(False) # Disable create button to prevent double-creation
+        
+        QMessageBox.information(self, "Success", f"Project Created Successfully!\nID: {uuid}")
+        
+        # JAWWAD: Enable Input and Output parameters now
+        self.enable_project_features()
+        
+        self.projectCreated.emit(uuid)
+        
+        # JAWWAD: DEBUG INFO
+        # This confirms emission. Ensure your MainWindow connects this signal to Foundation.set_project_id()!
+        print(f"JAWWAD DEBUG: Signal 'projectCreated' emitted with UUID: {uuid}")
+
+    @Slot(str)
+    def on_creation_error(self, msg):
+        self.create_btn.setText("Create Project")
+        self.create_btn.setEnabled(True)
+        QMessageBox.critical(self, "Error", f"Failed to create project:\n{msg}")
+
+    # JAWWAD: Helper to enable features
+    def enable_project_features(self):
+        # Enable Input Parameters
+        self.input_param_button.setEnabled(True)
+        self.input_param_button.setCursor(Qt.PointingHandCursor)
+        self.input_param_button.setStyleSheet(self.input_param_button_css_inactive)
+        
+        # Enable Outputs
+        self.output_button.setEnabled(True)
+        self.output_button.setCursor(Qt.PointingHandCursor)
+        self.output_button.setStyleSheet("""
+             QPushButton#output_button {
+                background-color: #FDEFEF;
+                border: 1px solid #000000;
+                text-align: left;
+                padding: 3px 10px;
+                color: #000000;
+                font-size: 14px;
+            }
+            QPushButton#output_button:hover {
+                background-color: #F0E6E6;
+                border: 1px solid #000000;
+            }
+            QPushButton#output_button:pressed {
+                background-color: #FFF3F3;
+                border-color: #606060;
+            }
+        """)
+
+        # Optional: Collapse General Info to show progress
+        if self.general_button_active:
+            self.expand_general_area() 
+
+    # --- EXISTING LOGIC ---
+
+    # JAWWAD : NEW METHOD: Handle Country Changes to update Currency
+    @Slot(str)
+    def on_country_changed(self, country_name):
+        """Update the Currency field based on the selected Country."""
+        # Retrieve currency from map, default to "USD" if not found
+        currency = self.COUNTRY_CURRENCY_MAP.get(country_name, "USD")
+        self.currency_input.setText(currency)
+
+    # JAWWAD : NEW METHOD: Auto-Refresh UI Options from backend
+    @Slot() 
+    def refresh_ui_options(self):
+        """Called automatically when SOR backend updates."""
+        print("UI: Refreshing Region/SOR dropdowns in Project Details...")
+        
+        # Save current selection to restore it after refresh if possible
+        current_region = self.region_combo.currentText()
+        current_sor = self.sor_combo.currentText()
+        
+        # Reload Regions
+        self.region_combo.blockSignals(True)
+        self.region_combo.clear()
+        if sor_manager:
+            self.region_combo.addItems(sor_manager.get_regions())
+        else:
+            self.region_combo.addItems(["India", "USA"])
+        self.region_combo.blockSignals(False)
+        
+        # Restore Region Selection
+        idx = self.region_combo.findText(current_region)
+        if idx != -1:
+            self.region_combo.setCurrentIndex(idx)
+        elif self.region_combo.count() > 0:
+            self.region_combo.setCurrentIndex(0)
+            
+        # Trigger update for SOR list based on the (potentially new) region
+        self.on_region_changed(self.region_combo.currentText())
+        
+        # Restore SOR Selection
+        idx_sor = self.sor_combo.findText(current_sor)
+        if idx_sor != -1:
+            self.sor_combo.setCurrentIndex(idx_sor)
+
+    # JAWWAD : NEW METHOD: Handle Region Changes
+    def on_region_changed(self, new_region):
+        """Update SOR dropdown when Region changes"""
+        if not sor_manager: return
+        sors = sor_manager.get_sors_for_region(new_region)
+        self.sor_combo.blockSignals(True)
+        self.sor_combo.clear()
+        self.sor_combo.addItems(sors)
+        self.sor_combo.blockSignals(False)
+        # Trigger update for the first SOR in the new list if available
+        if sors:
+            self.sor_combo.setCurrentIndex(0)
+            self.on_sor_changed(sors[0])
+
+    # JAWWAD : NEW METHOD: Handle SOR Changes
+    def on_sor_changed(self, new_sor):
+        """Tell backend to load new data when SOR changes"""
+        if not sor_manager or not new_sor: return
+        region = self.region_combo.currentText()
+        success, msg = sor_manager.set_active_sor(region, new_sor)
+        if success:
+            print(f"UI: Successfully loaded {new_sor}")
+        else:
+            print(f"UI: Failed to load {new_sor}: {msg}")
+
     def expand_general_area(self):
         try:
             self.general_widget_animation.finished.disconnect()
-        except RuntimeError:
+        except (RuntimeError, TypeError):
             pass
         if self.general_button_active:
             self.general_info_button.setIcon(self.unactive_arrow_icon)
@@ -527,30 +876,3 @@ class ProjectDetailsWidget(QWidget):
     def close_widget(self):
         self.closed.emit()
         self.setParent(None)
-
-#----------------Standalone-Test-Code--------------------------------
-
-# class MyMainWindow(QMainWindow):
-#     def __init__(self):
-#         super().__init__()
-
-#         self.setStyleSheet("border: none")
-
-#         self.central_widget = QWidget()
-#         self.central_widget.setObjectName("central_widget")
-#         self.setCentralWidget(self.central_widget)
-
-#         self.main_h_layout = QHBoxLayout(self.central_widget)
-#         self.main_h_layout.addStretch(1)
-
-#         self.main_h_layout.addWidget(ProjectDetailsWidget(), 2)
-
-#         self.setWindowState(Qt.WindowMaximized)
-
-
-# if __name__ == "__main__":
-#     QCoreApplication.setAttribute(Qt.AA_DontShowIconsInMenus, False)
-#     app = QApplication(sys.argv)
-#     window = MyMainWindow()
-#     window.show()
-#     sys.exit(app.exec())
