@@ -503,11 +503,41 @@ class HomeWindow(QMainWindow):
     
     def openNewProject(self):
         from osbridgelcca.desktop_app.main_template import UiMainWindow
+        
+        # JAWWAD: FIX - Removed static imports to avoid ModuleNotFoundError.
+        # We will use finding children to locate widgets instead.
+
         class LCCA(QMainWindow):
             def __init__(self):
                 super().__init__()
                 self.ui = UiMainWindow()
                 self.ui.setupUi(self)
+                
+                # JAWWAD: AUTO-CONNECT SIGNAL LOGIC
+                # 1. Locate the ProjectDetailsWidget (Creator)
+                creator = None
+                # 2. Locate the Foundation widget (Receiver)
+                receiver = None
+                
+                # Scan all widgets in this window
+                all_widgets = self.findChildren(QWidget)
+                
+                for w in all_widgets:
+                    # Identify Creator by the signal 'projectCreated'
+                    if hasattr(w, 'projectCreated') and not creator:
+                        creator = w
+                    # Identify Receiver by the method 'set_project_id'
+                    if hasattr(w, 'set_project_id') and not receiver:
+                        receiver = w
+                
+                if creator and receiver:
+                    print(f"Successfully connected {creator.objectName()} -> {receiver.objectName()}")
+                    # Connect the signal!
+                    creator.projectCreated.connect(receiver.set_project_id)
+                else:
+                    print(f"Could not auto-connect widgets.")
+                    if not creator: print(" - Creator widget (ProjectDetailsWidget) not found.")
+                    if not receiver: print(" - Receiver widget (Foundation) not found.")
 
         app = QApplication.instance()
         app.home_window.close()

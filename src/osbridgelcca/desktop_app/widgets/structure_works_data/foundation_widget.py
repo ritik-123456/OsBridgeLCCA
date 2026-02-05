@@ -11,6 +11,7 @@ import sys
 DROPDOWN_UNITS = ["cum", "MT", "Rmt", "RMT", "m2", "number"]
 
 # --- IMPORTS ---
+# Assuming these modules exist in your project structure as per the original code
 from osbridgelcca.desktop_app.widgets.utils.data import *
 
 try:
@@ -19,6 +20,13 @@ try:
 except ImportError:
     print("Warning: sor_backend.py not found. Search features will be limited.")
     sor_manager = None
+
+# JAWWAD : Import ProjectDataManager for real-time saving functionality
+try:
+    from osbridgelcca.desktop_app.core.data_manager import ProjectDataManager
+except ImportError:
+    print("Warning: ProjectDataManager not found. Real-time saving disabled.")
+    ProjectDataManager = None
 
 # --- NEW: Event Filter for Locking Logic (Fixed Flickering) ---
 class LockEventFilter(QObject):
@@ -49,6 +57,9 @@ class LockEventFilter(QObject):
 
 # --- UPDATED: MATERIAL INPUT POPUP ---
 class MaterialInputPopup(QDialog):
+    # --- NEW: Signal to send data without closing the popup ---
+    data_submitted = Signal(dict)
+
     def __init__(self, material_data_source, component_name, current_region, current_sor, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Material Details")
@@ -62,6 +73,9 @@ class MaterialInputPopup(QDialog):
         self.result_data = None
         
         self.init_ui()
+        
+        # JAWWAD: Install event filter on the dialog itself to detect clicks outside the suggestion box
+        self.installEventFilter(self)
         
     def init_ui(self):
         self.setStyleSheet("""
@@ -112,8 +126,6 @@ class MaterialInputPopup(QDialog):
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("font-size: 11px; margin-left: 2px;")
         self.form_layout.addRow("", self.status_label)
-
-        # Removed Grade Input from Popup
         
         self.quantity_edit = QLineEdit()
         self.quantity_edit.setValidator(QDoubleValidator(0.001, 9999999.99, 3))
@@ -154,8 +166,36 @@ class MaterialInputPopup(QDialog):
         self.error_label.setWordWrap(True)
         layout.addWidget(self.error_label)
 
+        # --- RECYCLABLE SECTION ---
         self.recyclable_check = QCheckBox("Recyclable")
+        # JAWWAD : Connect toggled signal to show/hide extra fields
+        self.recyclable_check.toggled.connect(self.on_recyclable_toggled)
         layout.addWidget(self.recyclable_check)
+
+        # JAWWAD : Container for extra fields when Recyclable is checked
+        self.recyclable_fields_widget = QWidget()
+        self.recyclable_fields_layout = QFormLayout(self.recyclable_fields_widget)
+        self.recyclable_fields_layout.setContentsMargins(20, 0, 0, 0) # Indent slightly
+        self.recyclable_fields_layout.setSpacing(10)
+        self.recyclable_fields_layout.setLabelAlignment(Qt.AlignLeft)
+
+        # JAWWAD : 1. Scrap Rate Input
+        self.scrap_rate_edit = QLineEdit()
+        self.scrap_rate_edit.setValidator(QDoubleValidator(0.0, 9999999.99, 2))
+        self.scrap_rate_edit.setPlaceholderText("0.00")
+        self.recyclable_fields_layout.addRow("Scrap Rate *", self.scrap_rate_edit)
+
+        # JAWWAD : 2. Percentage of Quantities Input
+        self.percentage_qty_edit = QLineEdit()
+        self.percentage_qty_edit.setValidator(QDoubleValidator(0.0, 100.0, 2))
+        self.percentage_qty_edit.setPlaceholderText("0-100%")
+        self.recyclable_fields_layout.addRow("Percentage of Quantities (%) *", self.percentage_qty_edit)
+
+        # JAWWAD : Initially hidden
+        self.recyclable_fields_widget.setVisible(False)
+        layout.addWidget(self.recyclable_fields_widget)
+
+        # --- END RECYCLABLE SECTION ---
         
         self.edit_check = QCheckBox("Edit")
         self.edit_check.toggled.connect(self.on_edit_toggled)
@@ -194,6 +234,30 @@ class MaterialInputPopup(QDialog):
         
         self.on_material_text_changed(self.material_input.text())
 
+    # JAWWAD: Event Filter to handle clicking outside the suggestion box
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress:
+            # If the suggestion list is visible
+            if self.suggestion_list.isVisible():
+                # Check if the click occurred on the suggestion list or the input field
+                # We map coordinates to global to ensure accuracy
+                list_rect = self.suggestion_list.rect()
+                list_global_pos = self.suggestion_list.mapToGlobal(QPoint(0, 0))
+                list_global_rect = QRect(list_global_pos, list_rect.size())
+
+                input_rect = self.material_input.rect()
+                input_global_pos = self.material_input.mapToGlobal(QPoint(0, 0))
+                input_global_rect = QRect(input_global_pos, input_rect.size())
+                
+                # Get mouse global position
+                mouse_pos = event.globalPosition().toPoint()
+
+                # If click is NOT in list AND NOT in input, hide the list
+                if not list_global_rect.contains(mouse_pos) and not input_global_rect.contains(mouse_pos):
+                    self.suggestion_list.hide()
+        
+        return super().eventFilter(obj, event)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self.suggestion_list.isVisible():
@@ -207,26 +271,25 @@ class MaterialInputPopup(QDialog):
         self.suggestion_list.setFixedWidth(available_width)
         self.suggestion_list.raise_()
 
+    # JAWWAD : New method to handle visibility toggling of recyclable fields
+    def on_recyclable_toggled(self, checked):
+        """Shows or hides the extra recyclable fields based on checkbox state."""
+        self.recyclable_fields_widget.setVisible(checked)
+        if not checked:
+            self.scrap_rate_edit.clear()
+            self.percentage_qty_edit.clear()
+
     def update_search_results(self, text):
-        # Use the dynamic searcher from the manager
         if not sor_manager or not sor_manager.searcher: return
         
-        # --- ENABLED: Search from SOR Manager (Backend) ---
-        # Note: searcher logic is encapsulated in sor_backend
+        # Search Backend ONLY (As requested by user: Search should only happen from SOR Manager)
         backend_results = sor_manager.searcher.performSearch([self.component_name.lower()], text)
         backend_items = [item['name'] for item in backend_results]
 
-        # --- DISABLED: Search from Local Data (Excel) ---
-        data_py_items = []
-        # if self.material_data_source:
-        #     norm_text = text.lower().strip()
-        #     tokens = norm_text.split()
-        #     for key in self.material_data_source.keys():
-        #         key_lower = key.lower()
-        #         if all(t in key_lower for t in tokens):
-        #             data_py_items.append(key)
-
-        all_items = sorted(list(set(backend_items + data_py_items)))
+        # JAWWAD: Removed local dictionary search logic (data_py_items) 
+        # to ensure we don't mix non-standard items in the search results.
+        all_items = sorted(list(set(backend_items)))
+        
         self.suggestion_list.clear()
         
         if not text.strip():
@@ -247,17 +310,15 @@ class MaterialInputPopup(QDialog):
     def on_material_text_changed(self, text):
         self.error_label.setText("") 
         backend_data = None
-        data_py_data = None
+        # data_py_data = None # JAWWAD: Removed local data variable
         
-        # Dynamically check searcher
+        # 1. Search in SOR Manager (The Authority)
         if sor_manager and sor_manager.searcher:
             backend_data = sor_manager.searcher.getDetailByName(text)
 
-        if not backend_data:
-            for key, val in self.material_data_source.items():
-                if key.lower() == text.lower():
-                    data_py_data = val
-                    break
+        # JAWWAD: Logic for looking up local 'data.py' removed.
+        # This prevents materials like "Soft Rock" (which might exist in local dicts 
+        # but are not SOR items) from triggering the read-only lock.
         
         if backend_data:
             self.status_label.setText(f"✅ Found standard material: {backend_data.get('name')}")
@@ -266,13 +327,11 @@ class MaterialInputPopup(QDialog):
             self.edit_check.setChecked(False)
             self.save_db_check.setVisible(False)
             
-            # Select appropriate unit from dropdown
             unit = backend_data.get("unit", "")
             index = self.unit_combo.findText(unit)
             if index != -1:
                 self.unit_combo.setCurrentIndex(index)
             else:
-                # If not in extracted list, allow setting it (or add it temporarily)
                 self.unit_combo.addItem(unit)
                 self.unit_combo.setCurrentText(unit)
             
@@ -286,35 +345,13 @@ class MaterialInputPopup(QDialog):
             is_recyclable = str(backend_data.get("recycleable", "")).lower() == "recyclable"
             self.recyclable_check.setChecked(is_recyclable)
             self.set_fields_readonly(True)
-            
-        elif data_py_data:
-            self.status_label.setText(f"✅ Found data material: {text}")
-            self.status_label.setStyleSheet("color: green; font-size: 11px; margin-left: 2px;")
-            self.edit_check.setVisible(True)
-            self.edit_check.setChecked(False)
-            self.save_db_check.setVisible(False)
-            
-            units = data_py_data.get(KEY_UNITS, [])
-            if units:
-                # Try to select the first unit from data_py in the combo
-                index = self.unit_combo.findText(units[0])
-                if index != -1:
-                    self.unit_combo.setCurrentIndex(index)
-            
-            self.set_fields_readonly(True)
-            
-            self.rate_edit.clear()
-            self.rate_source_edit.clear()
-            self.carbon_edit.clear()
-            self.carbon_unit_edit.clear()
-            self.conv_factor_edit.clear()
-            self.carbon_source_edit.clear()
-            self.recyclable_check.setChecked(False)
-            
+        
+        # JAWWAD: If it's not in the backend (SOR), it is treated as a Custom Material (e.g., Soft Rock)
         else:
             self.status_label.setText("") 
             self.edit_check.setVisible(False)
             self.save_db_check.setVisible(True)
+            # Crucial: This ensures "Soft Rock" and other custom items remain editable
             self.set_fields_readonly(False)
 
     def on_edit_toggled(self, checked):
@@ -331,7 +368,6 @@ class MaterialInputPopup(QDialog):
 
     def set_fields_readonly(self, readonly):
         self.unit_combo.setEnabled(not readonly)
-        # Removed Grade enabled logic
         self.rate_edit.setReadOnly(readonly)
         self.rate_source_edit.setReadOnly(readonly)
         self.carbon_edit.setReadOnly(readonly)
@@ -340,11 +376,19 @@ class MaterialInputPopup(QDialog):
         self.carbon_source_edit.setReadOnly(readonly)
         self.recyclable_check.setEnabled(not readonly)
         
+        # JAWWAD : New recyclable fields logic:
+        # If the main fields are readonly (found standard material), 
+        # usually recyclable state is also fixed.
+        self.scrap_rate_edit.setReadOnly(readonly)
+        self.percentage_qty_edit.setReadOnly(readonly)
+        
         base_style = "border: 1px solid #ccc; border-radius: 8px; padding: 6px 10px;"
         style = base_style + ("background-color: #E0E0E0;" if readonly else "background-color: #fcfcfc;")
             
+        # JAWWAD : Added scrap_rate_edit and percentage_qty_edit to style update
         for widget in [self.rate_edit, self.rate_source_edit, self.carbon_edit, 
-                       self.carbon_unit_edit, self.conv_factor_edit, self.carbon_source_edit]:
+                       self.carbon_unit_edit, self.conv_factor_edit, self.carbon_source_edit,
+                       self.scrap_rate_edit, self.percentage_qty_edit]:
             widget.setStyleSheet(style)
         self.unit_combo.setStyleSheet(style)
 
@@ -390,10 +434,34 @@ class MaterialInputPopup(QDialog):
             except ValueError:
                 errors.append("Carbon Emission must be a number or 'NA'.")
 
+        # JAWWAD : Validate Recyclable Fields (Scrap Rate and Percentage)
+        if self.recyclable_check.isChecked():
+            # Validate Scrap Rate
+            scrap_text = self.scrap_rate_edit.text().strip()
+            if not scrap_text:
+                errors.append("Scrap Rate is required when Recyclable is checked.")
+            else:
+                try:
+                    s_val = float(scrap_text)
+                    if s_val < 0: errors.append("Scrap Rate must be ≥ 0.")
+                except ValueError:
+                    errors.append("Scrap Rate must be a valid number.")
+
+            # Validate Percentage
+            perc_text = self.percentage_qty_edit.text().strip()
+            if not perc_text:
+                errors.append("Percentage of Quantities is required when Recyclable is checked.")
+            else:
+                try:
+                    p_val = float(perc_text)
+                    if p_val < 0 or p_val > 100: errors.append("Percentage must be between 0 and 100.")
+                except ValueError:
+                    errors.append("Percentage must be a valid number.")
+        # JAWWAD : End recyclable fields validation
+
         if self.save_db_check.isChecked():
             existing_keys = [k.lower() for k in self.material_data_source.keys()]
             backend_exists = False
-            # Check dynamic searcher
             if sor_manager and sor_manager.searcher and sor_manager.searcher.getDetailByName(name):
                 backend_exists = True
             if name.lower() in existing_keys or backend_exists:
@@ -404,17 +472,15 @@ class MaterialInputPopup(QDialog):
             return
 
         is_custom = True
-        # Check dynamic searcher
         if sor_manager and sor_manager.searcher and sor_manager.searcher.getDetailByName(name):
             is_custom = False
-        if is_custom:
-            for key in self.material_data_source.keys():
-                if key.lower() == name.lower():
-                    is_custom = False; break
+        
+        # JAWWAD: Removed logic checking self.material_data_source to enforce SOR-only standards.
+        # This keeps consistency with the update_search_results logic.
 
         self.result_data = {
             KEY_TYPE: name,
-            KEY_GRADE: "Standard", # Defaulting Grade to Standard as UI is removed
+            KEY_GRADE: "Standard",
             KEY_QUANTITY: self.quantity_edit.text(),
             KEY_UNIT_M3: self.unit_combo.currentText(),
             KEY_RATE: self.rate_edit.text(),
@@ -424,10 +490,37 @@ class MaterialInputPopup(QDialog):
             "conversion_factor": self.conv_factor_edit.text(),
             "carbon_source": self.carbon_source_edit.text(),
             "recyclable": self.recyclable_check.isChecked(),
+            # JAWWAD : Add new keys to result data
+            "scrap_rate": self.scrap_rate_edit.text() if self.recyclable_check.isChecked() else "",
+            "recycle_percentage": self.percentage_qty_edit.text() if self.recyclable_check.isChecked() else "",
+            # JAWWAD : End adding new keys
             "save_to_db": self.save_db_check.isChecked(),
             "is_custom": is_custom
         }
-        self.accept()
+        
+        self.data_submitted.emit(self.result_data)
+        
+        self.clear_inputs()
+        self.status_label.setText("✅ Material Added Successfully! You can add another.")
+        self.status_label.setStyleSheet("color: blue; font-weight: bold; font-size: 11px; margin-left: 2px;")
+
+    def clear_inputs(self):
+        """Resets the input fields to allow adding another material quickly."""
+        self.material_input.clear()
+        self.quantity_edit.clear()
+        self.rate_edit.clear()
+        self.rate_source_edit.clear()
+        self.carbon_edit.clear()
+        self.carbon_unit_edit.clear()
+        self.conv_factor_edit.clear()
+        self.carbon_source_edit.clear()
+        # JAWWAD : Clear recyclability check which also hides and clears extra fields
+        self.recyclable_check.setChecked(False) 
+        self.save_db_check.setChecked(False)
+        self.edit_check.setChecked(False)
+        self.edit_check.setVisible(False)
+        self.unit_combo.setCurrentIndex(0)
+        self.material_input.setFocus() 
 
     def get_data(self):
         return self.result_data
@@ -500,9 +593,7 @@ class ComponentWidget(QWidget):
         self.material_grid_layout.setHorizontalSpacing(10)
         self.material_grid_layout.setVerticalSpacing(5)
 
-        # --- UPDATED: Set Column Stretch to widen 'Type of Material' columns ---
         # Adjusted ratio: Type (Col 0,1) gets weight 2 each (total 4).
-        # Others (Col 2-5) get weight 3 each.
         self.material_grid_layout.setColumnStretch(0, 2) 
         self.material_grid_layout.setColumnStretch(1, 2) 
         self.material_grid_layout.setColumnStretch(2, 3) # Quantity
@@ -511,7 +602,6 @@ class ComponentWidget(QWidget):
         self.material_grid_layout.setColumnStretch(5, 3) # Source
         self.material_grid_layout.setColumnStretch(6, 0) # Button (Fixed)
 
-        # Removed Grade from Headers, Type spans 2 columns
         headers = ["Type of Material", "Quantity", "Unit", "Rate", "Rate Data Source"]
         for col, header_text in enumerate(headers):
             label = QLabel(header_text)
@@ -519,18 +609,12 @@ class ComponentWidget(QWidget):
             label.setObjectName("MaterialGridLabel")
             
             if col == 0:
-                # Type of Material spans 2 columns (0 and 1)
                 self.material_grid_layout.addWidget(label, 0, 0, 1, 2)
             else:
-                # Adjust column index: list index 1 (Quantity) goes to grid col 2
-                # list index 2 (Unit) goes to grid col 3, etc.
                 grid_col = col + 1 
                 self.material_grid_layout.addWidget(label, 0, grid_col)
 
         self.component_first_scroll_content_layout.addLayout(self.material_grid_layout)
-
-        # self.add_material_row()
-        # self.add_material_row()
 
         self.update_comp_material(self.component_combobox.currentText())
 
@@ -550,27 +634,23 @@ class ComponentWidget(QWidget):
     def set_locked(self, locked):
         self.is_locked = locked
         
-        # Helper to apply style updates for locking
         def set_widget_locked(widget):
             widget.setProperty("locked_state", str(locked).lower())
             widget.style().unpolish(widget)
             widget.style().polish(widget)
 
-        # 1. Main Component Widgets
         set_widget_locked(self.component_combobox)
         set_widget_locked(self.add_material_button)
         set_widget_locked(self.remove_component_button)
         
-        # 2. Row Widgets - Force Update on Every Input Widget
         for row in self.material_rows:
             set_widget_locked(row[KEY_TYPE])
-            # Grade is removed, skipping
             set_widget_locked(row[KEY_QUANTITY])
             set_widget_locked(row[KEY_UNIT_M3])
             set_widget_locked(row[KEY_RATE])
             set_widget_locked(row[KEY_RATE_DATA_SOURCE])
             set_widget_locked(row['remove_button'])
-   
+    
     def collect_data(self):
         rows_data = []
         for row in self.material_rows:
@@ -582,7 +662,6 @@ class ComponentWidget(QWidget):
             else:
                 material_type = widget_type.text()
 
-            # Grade is removed from UI, defaulting to "Standard"
             material_grade = "Standard"
 
             widget_unit = row[KEY_UNIT_M3]
@@ -607,6 +686,10 @@ class ComponentWidget(QWidget):
                          "conversion_factor": row.get("conversion_factor", ""),
                          "carbon_source": row.get("carbon_source", ""),
                          "recyclable": row.get("recyclable", False),
+                         # JAWWAD : Capture new fields in collected data
+                         "scrap_rate": row.get("scrap_rate", ""),
+                         "recycle_percentage": row.get("recycle_percentage", ""),
+                         # JAWWAD : End Capture
                          "save_to_db": row.get("save_to_db", False)
                         }
             rows_data.append(row_dict)
@@ -619,7 +702,6 @@ class ComponentWidget(QWidget):
             self.parent_widget.mark_state_changed()
 
     def _on_type_material_changed(self, text, unit_widget):
-        # self.update_comp_grades(text, grade_widget) # Removed as grade is gone
         self.update_comp_units(text, unit_widget)
         self._on_value_changed()
 
@@ -629,7 +711,6 @@ class ComponentWidget(QWidget):
 
         for i in range(len(self.material_rows)):
             material_widget = self.material_rows[i][KEY_TYPE]
-            # Grade combo removed
             unit_combo = self.material_rows[i][KEY_UNIT_M3]
             
             if isinstance(material_widget, QComboBox):
@@ -637,26 +718,16 @@ class ComponentWidget(QWidget):
                 material_widget.addItems(materials)
                 current_text = material_widget.currentText()
                 if current_text:
-                    # self.update_comp_grades(current_text, grade_combo) # Removed
                     self.update_comp_units(current_text, unit_combo)
             
             elif isinstance(material_widget, QLineEdit):
                 current_text = material_widget.text()
                 if current_text:
-                    # self.update_comp_grades(current_text, grade_combo) # Removed
                     self.update_comp_units(current_text, unit_combo)
 
         self._on_value_changed()
-   
-    # def update_comp_grades(self, selected_material, widget):
-    #     selected_component = self.component_combobox.currentText()
-    #     grades = self.data.get(selected_component,{}).get(selected_material,{}).get(KEY_GRADE,[])
-    #     widget.clear()
-    #     widget.addItems(grades)
-   
+    
     def update_comp_units(self, selected_material, widget):
-        selected_component = self.component_combobox.currentText()
-        # Use extracted units list
         units = DROPDOWN_UNITS
         widget.clear()
         widget.addItems(units)
@@ -665,32 +736,88 @@ class ComponentWidget(QWidget):
         selected_component = self.component_combobox.currentText()
         materials_data = self.data.get(selected_component, {})
         
-        # --- NEW: Retrieve current Region and SOR from parent Foundation ---
         current_region = "Unknown"
         current_sor = "Unknown"
         if self.parent_widget:
-            # Accessing the public combos from the Foundation parent
             current_region = self.parent_widget.region_combo.currentText()
             current_sor = self.parent_widget.sor_combo.currentText()
             
         popup = MaterialInputPopup(materials_data, selected_component, current_region, current_sor, self)
-        if popup.exec() == QDialog.Accepted:
-            data = popup.get_data()
-            self.add_row_from_popup_data(data)
+        popup.data_submitted.connect(self.add_row_from_popup_data)
+        popup.exec() 
 
     def add_row_from_popup_data(self, data):
-        if data.get('is_custom', False):
-            self.add_custom_material_row(data)
+        # JAWWAD : START Real-time Save Implementation
+        saved_item_id = None
+        # Triggers data save to JSON file immediately after adding to UI
+        if self.parent_widget and getattr(self.parent_widget, 'data_manager', None) and self.parent_widget.project_id:
+            try:
+                # Determine sub-category from combobox
+                sub_cat = "foundation"
+                
+                # Call the manager
+                # NOTE: We assume everything in Foundation widget goes under "construction_work_data"
+                # If you need this to be different, adjust 'category' parameter below.
+                saved_item_id = self.parent_widget.data_manager.add_material_item(
+                    project_id=self.parent_widget.project_id,
+                    category="construction_work_data",
+                    sub_category=sub_cat,
+                    material_data=data
+                )
+                print(f"✅ Real-time save successful for {sub_cat}. ID: {saved_item_id}")
+            except Exception as e:
+                print(f"❌ Real-time save failed: {e}")
         else:
-            self.add_material_row(data)
+            # JAWWAD: DEBUGGING - This tells you WHY it failed
+            print("CRITICAL ERROR: Save skipped!")
+            if not self.parent_widget: print(" - Parent widget is None")
+            elif not getattr(self.parent_widget, 'data_manager', None): print(" - Data Manager is None")
+            elif not getattr(self.parent_widget, 'project_id', None): print(" - Project ID is None (Did you call set_project_id?)")
+        # JAWWAD : END Real-time Save Implementation
 
-    def add_custom_material_row(self, data=None):
+        # JAWWAD: Pass the saved ID to the row creator so we can delete it later
+        if data.get('is_custom', False):
+            self.add_custom_material_row(data, item_id=saved_item_id)
+        else:
+            self.add_material_row(data, item_id=saved_item_id)
+
+    # JAWWAD: New method to handle Auto-Delete
+    def handle_auto_delete(self, row_widgets):
+        """
+        Handles removing the row from UI AND deleting from Autosave JSON.
+        """
+        # 1. Get the ID we stored during creation
+        item_id = row_widgets.get('db_id')
+
+        # 2. If we have an ID and a Data Manager, call the delete API
+        if item_id and self.parent_widget and getattr(self.parent_widget, 'data_manager', None):
+            try:
+                sub_cat = "foundation"
+                
+                # We assume delete_material_item exists in data_manager
+                self.parent_widget.data_manager.delete_material_item(
+                    project_id=self.parent_widget.project_id,
+                    category="construction_work_data",
+                    sub_category=sub_cat,
+                    item_id=item_id
+                )
+                print(f"🗑️ Triggered auto-delete for ID: {item_id}")
+            except Exception as e:
+                print(f"❌ Auto-delete failed: {e}")
+
+        # 3. Remove from UI (Visual)
+        self.remove_material_row_by_widgets(row_widgets)
+
+    def add_custom_material_row(self, data=None, item_id=None):
         validator = QDoubleValidator()
         validator.setRange(0.0, 9999999.999, 3)
         validator.setBottom(0.0)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
-   
+    
         row_widgets = {}
+        # JAWWAD: Store the Database ID
+        row_widgets['db_id'] = item_id
+
         row_idx = self.current_material_row_idx
         
         type_material_input = QLineEdit()
@@ -699,24 +826,12 @@ class ComponentWidget(QWidget):
         type_material_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         type_material_input.installEventFilter(self.lock_event_filter)
         
-        # --- MODIFIED: Make Type Read Only in Grid ---
         type_material_input.setReadOnly(True)
-        # specific request: should not be grey
         type_material_input.setStyleSheet("background-color: #FFFFFF; color: #000000;")
         
-        # SPAN 2 COLUMNS (0 and 1)
         self.material_grid_layout.addWidget(type_material_input, row_idx, 0, 1, 2)
         row_widgets[KEY_TYPE] = type_material_input
         type_material_input.textChanged.connect(self._on_value_changed)
-
-        # Removed Grade Input
-        # Columns shift: 
-        # Type: 0 (span 2 -> covers 0,1)
-        # Quantity: 2
-        # Unit: 3
-        # Rate: 4
-        # Source: 5
-        # Remove: 6
 
         quantity_edit = QLineEdit()
         quantity_edit.setValidator(validator)
@@ -729,9 +844,8 @@ class ComponentWidget(QWidget):
         quantity_edit.textChanged.connect(self._on_value_changed)
 
         unit_combo_m3 = QComboBox()
-        # --- MODIFIED: Strict Dropdown for Unit using extracted list ---
         unit_combo_m3.setEditable(False)
-        unit_combo_m3.setMinimumWidth(120) # Make wider
+        unit_combo_m3.setMinimumWidth(120) 
         unit_combo_m3.addItems(DROPDOWN_UNITS)
         unit_combo_m3.setObjectName("MaterialGridInput")
         unit_combo_m3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -779,7 +893,8 @@ class ComponentWidget(QWidget):
                 color: #CCCCCC;
             }
         """)
-        remove_button.clicked.connect(lambda: self.remove_material_row_by_widgets(row_widgets))
+        # JAWWAD: Connect to auto-delete handler
+        remove_button.clicked.connect(lambda: self.handle_auto_delete(row_widgets))
         
         self.material_grid_layout.addWidget(remove_button, row_idx, 6, alignment=Qt.AlignCenter)
         
@@ -788,10 +903,7 @@ class ComponentWidget(QWidget):
         if data:
             type_material_input.setText(data.get(KEY_TYPE, ""))
             
-            # Removed Grade update logic
             self.update_comp_units(type_material_input.text(), unit_combo_m3)
-            
-            # Removed Grade target setting
             
             target_unit = data.get(KEY_UNIT_M3, "")
             if target_unit:
@@ -808,6 +920,10 @@ class ComponentWidget(QWidget):
             row_widgets["conversion_factor"] = data.get("conversion_factor")
             row_widgets["carbon_source"] = data.get("carbon_source")
             row_widgets["recyclable"] = data.get("recyclable")
+            # JAWWAD : Save new recyclable data fields to row widgets
+            row_widgets["scrap_rate"] = data.get("scrap_rate")
+            row_widgets["recycle_percentage"] = data.get("recycle_percentage")
+            # JAWWAD : End Saving
             row_widgets["save_to_db"] = data.get("save_to_db")
 
         self.material_rows.append(row_widgets)
@@ -817,13 +933,16 @@ class ComponentWidget(QWidget):
         self.adjustSize()
         self._on_value_changed()
 
-    def add_material_row(self, data=None):
+    def add_material_row(self, data=None, item_id=None):
         validator = QDoubleValidator()
         validator.setRange(0.0, 9999999.999, 3)
         validator.setBottom(0.0)
         validator.setNotation(QDoubleValidator.Notation.StandardNotation)
-   
+    
         row_widgets = {}
+        # JAWWAD: Store the Database ID
+        row_widgets['db_id'] = item_id
+
         row_idx = self.current_material_row_idx
 
         type_material_input = QLineEdit()
@@ -831,17 +950,12 @@ class ComponentWidget(QWidget):
         type_material_input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         type_material_input.installEventFilter(self.lock_event_filter)
         
-        # --- MODIFIED: Make Type Read Only in Grid ---
         type_material_input.setReadOnly(True)
-        # specific request: should not be grey
         type_material_input.setStyleSheet("background-color: #FFFFFF; color: #000000;")
         
-        # SPAN 2 COLUMNS (0 and 1)
         self.material_grid_layout.addWidget(type_material_input, row_idx, 0, 1, 2)
         row_widgets[KEY_TYPE] = type_material_input
         type_material_input.textChanged.connect(self._on_value_changed)
-
-        # Removed Grade Combo
 
         quantity_edit = QLineEdit()
         quantity_edit.setValidator(validator)
@@ -854,9 +968,8 @@ class ComponentWidget(QWidget):
         quantity_edit.textChanged.connect(self._on_value_changed)
 
         unit_combo_m3 = QComboBox()
-        # --- MODIFIED: Strict Dropdown for Unit using extracted list ---
         unit_combo_m3.setEditable(False)
-        unit_combo_m3.setMinimumWidth(120) # Make wider
+        unit_combo_m3.setMinimumWidth(120) 
         unit_combo_m3.addItems(DROPDOWN_UNITS)
         unit_combo_m3.setObjectName("MaterialGridInput")
         unit_combo_m3.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -904,7 +1017,8 @@ class ComponentWidget(QWidget):
                 color: #CCCCCC;
             }
         """)
-        remove_button.clicked.connect(lambda: self.remove_material_row_by_widgets(row_widgets))
+        # JAWWAD: Connect to auto-delete handler
+        remove_button.clicked.connect(lambda: self.handle_auto_delete(row_widgets))
         
         self.material_grid_layout.addWidget(remove_button, row_idx, 6, alignment=Qt.AlignCenter)
         
@@ -920,10 +1034,7 @@ class ComponentWidget(QWidget):
         if data:
             type_material_input.setText(data.get(KEY_TYPE, ""))
             
-            # Removed Grade update logic
             self.update_comp_units(type_material_input.text(), unit_combo_m3)
-            
-            # Removed Grade target setting
             
             target_unit = data.get(KEY_UNIT_M3, "")
             if target_unit:
@@ -940,20 +1051,20 @@ class ComponentWidget(QWidget):
             row_widgets["conversion_factor"] = data.get("conversion_factor")
             row_widgets["carbon_source"] = data.get("carbon_source")
             row_widgets["recyclable"] = data.get("recyclable")
+            # JAWWAD : Save new recyclable data fields to row widgets
+            row_widgets["scrap_rate"] = data.get("scrap_rate")
+            row_widgets["recycle_percentage"] = data.get("recycle_percentage")
+            # JAWWAD : End Saving
             row_widgets["save_to_db"] = data.get("save_to_db")
 
         self.updateGeometry()
         self.adjustSize()
         self._on_value_changed()
 
-    #ritik
-    
-    # --- ADDED THIS METHOD ---
     def clear_rows(self):
         rows_to_remove = self.material_rows[:]
         for row_dict in rows_to_remove:
             self.remove_material_row_by_widgets(row_dict)
-    #ritik
 
     def remove_material_row_by_widgets(self, row_widgets_to_remove):
         if row_widgets_to_remove not in self.material_rows:
@@ -991,7 +1102,6 @@ class ComponentWidget(QWidget):
             while c_idx < self.material_grid_layout.columnCount():
                 item = self.material_grid_layout.itemAtPosition(r_idx + 1, c_idx)
                 if item:
-                    # Ritik: Safely get rowSpan and columnSpan (may not exist on all item types)
                     try:
                         row_span = item.rowSpan()
                         col_span = item.columnSpan()
@@ -1035,6 +1145,15 @@ class Foundation(QWidget):
     def __init__(self, database, parent=None):
         super().__init__()
         self.database_manager = database
+        
+        # JAWWAD : Project ID initialization for real-time saves
+        self.project_id = None 
+        # JAWWAD : Initialize ProjectDataManager if available
+        if ProjectDataManager:
+            self.data_manager = ProjectDataManager() 
+        else:
+            self.data_manager = None
+
         self.data_id = []
         self.setObjectName("central_panel_widget")
         self.component_widgets = []
@@ -1043,10 +1162,8 @@ class Foundation(QWidget):
         self.is_first_visit = True
         self.is_locked = False
         
-        # --- NEW: Cooldown state for the warning tooltip ---
         self.warning_cooldown = False 
         
-        # --- Create Single Instance of Event Filter ---
         self.lock_filter = LockEventFilter(self)
 
         self.setStyleSheet("""
@@ -1063,7 +1180,6 @@ class Foundation(QWidget):
                 font-weight: bold;
                 color: #555555;
             }
-
             QScrollArea {
                 background-color: transparent;
                 outline: none;
@@ -1073,7 +1189,6 @@ class Foundation(QWidget):
                 border: 1px solid #000000;
                 padding-bottom: 20px;
             }
-
             QScrollBar:vertical {
                 border: 1px solid #E0E0E0;
                 background: #F0F0F0;
@@ -1081,14 +1196,12 @@ class Foundation(QWidget):
                 margin: 18px 0px 18px 0px;
                 border-radius: 6px;
             }
-
             QScrollBar::handle:vertical {
                 background: #C0C0C0;
                 border: 1px solid #A0A0A0;
                 min-height: 20px;
                 border-radius: 5px;
             }
-
             QScrollBar::add-line:vertical {
                 border: 1px solid #E0E0E0;
                 background: #E8E8E8;
@@ -1098,7 +1211,6 @@ class Foundation(QWidget):
                 border-bottom-left-radius: 6px;
                 border-bottom-right-radius: 6px;
             }
-
             QScrollBar::sub-line:vertical {
                 border: 1px solid #E0E0E0;
                 background: #E8E8E8;
@@ -1108,12 +1220,10 @@ class Foundation(QWidget):
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
             }
-
             QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
                 width: 10px;
                 height: 10px;
             }
-
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
                 background: none;
             }
@@ -1123,11 +1233,9 @@ class Foundation(QWidget):
             QScrollBar::down-arrow:vertical {
                 image: url(:/images/arrow_down.png);
             }
-
             QScrollBar::add-line:vertical:hover, QScrollBar::sub-line:vertical:hover {
                 background: #D0D0D0;
             }
-
             QPushButton#top_button_left_panel {
                 background-color: #FDEFEF;
                 border-top: 1px solid #000000;
@@ -1145,18 +1253,15 @@ class Foundation(QWidget):
                 background-color: #FFF3F3;
                 border-color: #606060;
             }
-
             #component_first_widget {
                 background-color: transparent;
                 margin-top: 10px;
             }
-
             #component_first_scroll_content_widget {
                 background-color: #FFFFFF;
                 padding: 10px;
                 border-radius: 8px;
             }
-
             QPushButton#nav_button {
                 background-color: #FFFFFF;
                 border: 1px solid #E0E0E0;
@@ -1174,7 +1279,6 @@ class Foundation(QWidget):
                 background-color: #E8E8E8;
                 border-color: #A0A0A0;
             }
-            
             QPushButton#lock_button {
                 background-color: #FFF8DC; 
                 border: 2px solid #DAA520; 
@@ -1198,7 +1302,6 @@ class Foundation(QWidget):
                 border-color: #45913E;
                 color: #00AA00;
             }
-            
             QLineEdit {
                 text-align: center;
             }
@@ -1230,7 +1333,6 @@ class Foundation(QWidget):
             QComboBox QAbstractItemView::item:hover {
                 background-color: #FDEFEF;
             }
-
             #MaterialGridLabel {
                 font-weight: bold;
                 color: #3F3E5E;
@@ -1251,7 +1353,6 @@ class Foundation(QWidget):
                 background-color: #F0F0F0;
                 color: #888888;
             }
-            
             QPushButton#add_material_button, QPushButton#add_component_button {
                 background-color: #FFFFFF;
                 border: 1px solid #E0E0E0;
@@ -1273,15 +1374,12 @@ class Foundation(QWidget):
                 color: #AAAAAA;
                 border-color: #D0D0D0;
             }
-            
-            /* --- UPDATED: Locked State Styling for visual feedback --- */
             QPushButton#add_material_button[locked_state="true"], 
             QPushButton#add_component_button[locked_state="true"] {
                 background-color: #F0F0F0;
                 color: #AAAAAA;
                 border-color: #D0D0D0;
             }
-            /* Use ID selector to override other styles with higher specificity */
             #MaterialGridInput[locked_state="true"] {
                 background-color: #E0E0E0;
                 color: #888888;
@@ -1293,42 +1391,35 @@ class Foundation(QWidget):
         self.left_panel_vlayout.setContentsMargins(0,0,0,0)
         self.left_panel_vlayout.setSpacing(0)
 
-        # --- UPDATED HEADER FOR REGION / SOR (Additional Inputs) ---
         header_container = QWidget()
         header_container.setStyleSheet("background-color: #FFF9F9; border-bottom: 1px solid #ccc;")
         header_layout = QHBoxLayout(header_container)
         header_layout.setContentsMargins(15, 10, 15, 10)
         
-        # 1. Region Input
         header_layout.addWidget(QLabel("Region:"))
         self.region_combo = QComboBox()
         self.region_combo.setFixedWidth(150)
         
-        # Load regions from manager or fallback
         if sor_manager:
             self.region_combo.addItems(sor_manager.get_regions())
-            # --- NEW: Connect to the backend signal for auto-refresh ---
             sor_manager.registry_updated.connect(self.refresh_ui_options)
         else:
-            self.region_combo.addItems(["India", "USA"]) # Fallback
+            self.region_combo.addItems(["India", "USA"])
             
         self.region_combo.currentTextChanged.connect(self.on_region_changed)
         header_layout.addWidget(self.region_combo)
         
         header_layout.addSpacing(20)
         
-        # 2. SOR Input
         header_layout.addWidget(QLabel("Select SOR:"))
         self.sor_combo = QComboBox()
         self.sor_combo.setFixedWidth(200)
-        # Initialize SOR list based on current region
         self.on_region_changed(self.region_combo.currentText()) 
         self.sor_combo.currentTextChanged.connect(self.on_sor_changed)
         header_layout.addWidget(self.sor_combo)
         
         header_layout.addStretch()
         
-        # Add Header to Main Layout
         self.left_panel_vlayout.addWidget(header_container)
 
         lock_hlayout = QHBoxLayout()
@@ -1381,6 +1472,11 @@ class Foundation(QWidget):
         self.left_panel_vlayout.addWidget(self.scroll_area)
         self._initializing = False
 
+    # JAWWAD : Method to allow Main Window to set the Project ID context
+    def set_project_id(self, pid):
+        self.project_id = pid
+        print(f"Foundation Widget: Project ID set to {pid}")
+
     def showEvent(self, event):
         super().showEvent(event)
         if not self.is_first_visit:
@@ -1388,17 +1484,12 @@ class Foundation(QWidget):
         else:
             self.is_first_visit = False
 
-    # --- NEW METHOD: Auto-Refresh UI Options ---
-    @Slot() # Explicitly marked as a Slot for robust Signal connection
+    @Slot()
     def refresh_ui_options(self):
-        """Called automatically when SOR backend updates."""
         print("UI: Refreshing Region/SOR dropdowns...")
-        
-        # Save current selection to restore it after refresh if possible
         current_region = self.region_combo.currentText()
         current_sor = self.sor_combo.currentText()
         
-        # Reload Regions
         self.region_combo.blockSignals(True)
         self.region_combo.clear()
         if sor_manager:
@@ -1407,37 +1498,30 @@ class Foundation(QWidget):
             self.region_combo.addItems(["India", "USA"])
         self.region_combo.blockSignals(False)
         
-        # Restore Region Selection
         idx = self.region_combo.findText(current_region)
         if idx != -1:
             self.region_combo.setCurrentIndex(idx)
         elif self.region_combo.count() > 0:
             self.region_combo.setCurrentIndex(0)
             
-        # Trigger update for SOR list based on the (potentially new) region
         self.on_region_changed(self.region_combo.currentText())
         
-        # Restore SOR Selection
         idx_sor = self.sor_combo.findText(current_sor)
         if idx_sor != -1:
             self.sor_combo.setCurrentIndex(idx_sor)
 
-    # --- NEW: Methods to Handle Region/SOR Changes ---
     def on_region_changed(self, new_region):
-        """Update SOR dropdown when Region changes"""
         if not sor_manager: return
         sors = sor_manager.get_sors_for_region(new_region)
         self.sor_combo.blockSignals(True)
         self.sor_combo.clear()
         self.sor_combo.addItems(sors)
         self.sor_combo.blockSignals(False)
-        # Trigger update for the first SOR in the new list if available
         if sors:
             self.sor_combo.setCurrentIndex(0)
             self.on_sor_changed(sors[0])
 
     def on_sor_changed(self, new_sor):
-        """Tell backend to load new data when SOR changes"""
         if not sor_manager or not new_sor: return
         region = self.region_combo.currentText()
         success, msg = sor_manager.set_active_sor(region, new_sor)
@@ -1448,8 +1532,7 @@ class Foundation(QWidget):
 
     def toggle_lock(self):
         self.set_form_locked(not self.is_locked)
-     
-    # --- UPDATED LOCK LOGIC: Only show Icons, Change State on Click ---
+       
     def set_form_locked(self, locked):
         self.is_locked = locked
         
@@ -1472,18 +1555,15 @@ class Foundation(QWidget):
         self.add_component_button.style().unpolish(self.add_component_button)
         self.add_component_button.style().polish(self.add_component_button)
         
-        # Lock Header inputs too
         self.region_combo.setEnabled(not locked)
         self.sor_combo.setEnabled(not locked)
 
-    # --- NEW: Helper method to handle triggering the warning with cooldown ---
     def trigger_lock_warning(self):
         if self.warning_cooldown:
             return
             
         self.warning_cooldown = True
         
-        # Calculate position beside the lock button
         if self.lock_button:
             global_pos = self.lock_button.mapToGlobal(QPoint(-80, self.lock_button.height() + 5))
             QToolTip.showText(global_pos, "Unlock to Edit", self.lock_button, self.lock_button.rect(), 2000)
@@ -1499,17 +1579,16 @@ class Foundation(QWidget):
             component_data = component_widget.collect_data()
             all_data.append(component_data)
         return all_data
-     
+        
     def mark_state_changed(self):
         if self._initializing:
             return
         self.state_changed = True
-     
+       
     def save_data(self):
         from pprint import pprint
         data = self.collect_data()
         print("\nCollected Data from Foundation UI:")
-        # Include context in debug output
         print(f"Context -> Region: {self.region_combo.currentText()}, SOR: {self.sor_combo.currentText()}")
         pprint(data)
             
@@ -1546,7 +1625,6 @@ class Foundation(QWidget):
         self.scroll_content_layout.addWidget(self.add_component_button, alignment=Qt.AlignCenter)
         self.scroll_content_layout.addLayout(self.button_h_layout) 
 
-        # Initial state sync
         if self.is_locked:
             new_component.set_locked(True)
 
@@ -1569,53 +1647,15 @@ class Foundation(QWidget):
     def close_widget(self):
         self.closed.emit()
         self.setParent(None)
-    
-    #Ritik - START: Improved Excel Data Mapping for Foundation Widget
+     
     def load_from_excel_sections(self, sections_data):
-        """
-        Load parsed Excel data sections into the Foundation widget.
-        
-        Data is grouped by component type - all materials for the same component
-        are displayed under one component widget.
-        
-        Expected sections_data structure:
-        [
-            {
-                'sheetName': 'Foundation',
-                'type': 'Excavation',  # Component name
-                'data': [
-                    {
-                        'name': 'Material Name',           # Material type/name
-                        'quantity': '100',                 # Quantity in Unit_A
-                        'unit': 'cum',                     # Unit of measurement
-                        'rate': '500.00',                  # Price per unit
-                        'rate_src': 'SOR 2024',            # Rate data source
-                        'carbon_emission': '50.5',         # Carbon emission kgCO2e/Unit_B
-                        'carbon_emission_units': 'kgCO2e', # Carbon units
-                        'conversion_factor': '2.5',        # Unit_A to Unit_B conversion
-                        'carbon_emission_src': 'IPCC',     # Carbon factor source
-                        'recycleable': 'Recyclable'        # Recyclable status
-                    },
-                    ...
-                ]
-            },
-            ...
-        ]
-        """
         print(f"\n[EXCEL IMPORT] Loading {len(sections_data)} section(s) into Foundation widget")
 
-        # Ritik - START: Remove any existing default components so imported data replaces them
-        # Remove any existing default components so imported data replaces them
         if getattr(self, 'component_widgets', None):
             print(f"  [INFO] Clearing {len(self.component_widgets)} existing component(s) before import")
             while self.component_widgets:
-                # remove_component_layout will handle deletion and layout updates
                 self.remove_component_layout(self.component_widgets[-1])
-        # Ritik - END: Removed default components prior to Excel import
         
-        # ritik: GROUP DATA BY COMPONENT TYPE
-        # This ensures that if multiple sections have the same component,
-        # all materials are displayed under one component widget
         component_data_map = {}
         total_materials = 0
         
@@ -1630,7 +1670,6 @@ class Foundation(QWidget):
             
             print(f"  [SECTION {section_idx}] Sheet: {sheet_name}, Component: {component_name}, Rows: {len(rows)}")
             
-            # ritik: Group all materials by component name
             if component_name not in component_data_map:
                 component_data_map[component_name] = []
                 print(f"    ✓ Grouped component: {component_name}")
@@ -1640,41 +1679,28 @@ class Foundation(QWidget):
         
         print(f"\n  [GROUPING] Total materials: {total_materials}, Total components: {len(component_data_map)}")
         
-        # ritik: CREATE COMPONENT WIDGETS AND POPULATE WITH GROUPED DATA
         for component_idx, (component_name, all_rows) in enumerate(component_data_map.items()):
             print(f"\n  [COMPONENT {component_idx}] {component_name} ({len(all_rows)} materials)")
             
-            # ritik: Add new component layout
             self.add_component_layout()
             new_comp_widget = self.component_widgets[-1]
             
-            # ritik: Set component dropdown to the component type
             index = new_comp_widget.component_combobox.findText(component_name, Qt.MatchFixedString)
             if index >= 0:
                 new_comp_widget.component_combobox.setCurrentIndex(index)
                 print(f"    ✓ Set component dropdown to: {component_name}")
             else:
-                # If component doesn't exist in dropdown, add it dynamically
                 new_comp_widget.component_combobox.addItem(component_name)
                 new_comp_widget.component_combobox.setCurrentText(component_name)
                 print(f"    ✓ Added new component: {component_name}")
 
-            # ritik: Clear existing placeholder rows
-            # Ritik - COMMENT OUT: clear_rows() has issues with rowSpan, just add materials instead
-            # new_comp_widget.clear_rows()
-            
-            # ritik: Process all materials for this component
             for row_idx, row_data in enumerate(all_rows):
                 try:
-                    # ritik: Validate and map each field from Excel row
-                    
-                    # Material name/type (REQUIRED)
                     material_name = str(row_data.get('name', '')).strip()
                     if not material_name:
                         print(f"      [WARN] Material {row_idx}: Missing material name, skipping")
                         continue
                     
-                    # Quantity - default to 1 if missing/invalid
                     quantity_val = row_data.get('quantity', '1')
                     try:
                         quantity_str = str(float(quantity_val))
@@ -1682,13 +1708,11 @@ class Foundation(QWidget):
                         quantity_str = '1'
                         print(f"      [INFO] Material {row_idx}: Invalid quantity '{quantity_val}', using default '1'")
                     
-                    # Unit - should match DROPDOWN_UNITS
                     unit_val = str(row_data.get('unit', '')).lower().strip()
                     if not unit_val or unit_val == 'none':
                         unit_val = 'cum'
                         print(f"      [INFO] Material {row_idx}: No unit specified, using default 'cum'")
                     
-                    # Rate (price per unit) - default to 0 if missing/invalid
                     rate_val = row_data.get('rate', '0')
                     try:
                         rate_str = str(float(rate_val))
@@ -1696,12 +1720,10 @@ class Foundation(QWidget):
                         rate_str = '0'
                         print(f"      [INFO] Material {row_idx}: Invalid rate '{rate_val}', using default '0'")
                     
-                    # Rate source
                     rate_source = str(row_data.get('rate_src', 'Excel Import')).strip()
                     if not rate_source:
                         rate_source = 'Excel Import'
                     
-                    # Carbon emission (optional)
                     carbon_emission_val = row_data.get('carbon_emission', 'not_available')
                     if carbon_emission_val is None:
                         carbon_emission_str = 'not_available'
@@ -1710,12 +1732,10 @@ class Foundation(QWidget):
                         if not carbon_emission_str or carbon_emission_str.lower() in ['na', 'not available', 'not_available', 'none']:
                             carbon_emission_str = 'not_available'
                     
-                    # Carbon emission units
                     carbon_units = str(row_data.get('carbon_emission_units', 'kgCO2e')).strip()
                     if not carbon_units:
                         carbon_units = 'kgCO2e'
                     
-                    # Conversion factor
                     conversion_factor_val = row_data.get('conversion_factor', 'not_available')
                     if conversion_factor_val is None:
                         conversion_factor_str = 'not_available'
@@ -1724,15 +1744,12 @@ class Foundation(QWidget):
                         if not conversion_factor_str or conversion_factor_str.lower() in ['na', 'not available', 'not_available', 'none']:
                             conversion_factor_str = 'not_available'
                     
-                    # Carbon source
                     carbon_source = str(row_data.get('carbon_emission_src', '')).strip()
                     
-                    # Recyclable status
                     recycleable_val = row_data.get('recycleable', 'Non-recyclable')
                     recycleable_str = str(recycleable_val).strip() if recycleable_val else 'Non-recyclable'
                     is_recyclable = recycleable_str.lower() in ['recyclable', 'recycleable', 'yes', 'true']
                     
-                    # ritik: Create mapped data structure
                     mapped_data = {
                         KEY_TYPE: material_name,
                         KEY_QUANTITY: quantity_str,
@@ -1748,7 +1765,6 @@ class Foundation(QWidget):
                         "is_custom": True
                     }
                     
-                    # ritik: Add material row to the component widget
                     if hasattr(new_comp_widget, 'add_custom_material_row'):
                         new_comp_widget.add_custom_material_row(mapped_data)
                         print(f"      ✓ Material {row_idx}: {material_name} | {quantity_str} {unit_val} @ {rate_source}")
@@ -1760,8 +1776,5 @@ class Foundation(QWidget):
                     print(f"      [ERROR] Material {row_idx}: Failed to process - {str(e)}")
                     continue
         
-        # ritik: Mark state as changed to indicate unsaved data
         self.mark_state_changed()
         print(f"\n[EXCEL IMPORT] ✓ Complete. All data grouped by components and loaded.\n")
-
-    #Ritik - END: Improved Excel Data Mapping for Foundation Widget

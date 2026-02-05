@@ -1,3 +1,4 @@
+
 """
 <Author>: Prerna Praveen Vidyarthi
 <Intern>: FOSSEE Summer Fellowship 2025
@@ -37,11 +38,8 @@ import numpy as np
 import os
 
 # JAWWAD : Database Constants Setup
-# Define the DB path relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# CHANGED: Renamed folder to 'temp_file_db'
 DB_FOLDER = os.path.join(BASE_DIR, "temp_file_db")
-# CHANGED: Renamed file to 'temporary_construction_data.json'
 JSON_DB_PATH = os.path.join(DB_FOLDER, "temporary_construction_data.json")
 
 # ================== RITIK : EXCEL PARSING LOGIC ==================
@@ -429,6 +427,9 @@ class UiMainWindow(object):
         # --- NEW: Flag to track if construction data is locked ---
         self.construction_locked = False
         # ---------------------------------------------------------
+        
+        # JAWWAD: Variable to store the active project UUID globally
+        self.current_project_id = None
 
         self.widget_map = {
             KEY_STRUCTURE_WORKS_DATA: Foundation, KEY_FOUNDATION: Foundation,
@@ -661,6 +662,12 @@ class UiMainWindow(object):
 
         self.construction_locked = True
 
+    # --- JAWWAD: New method to handle project ID signal from ProjectDetailsWidget ---
+    def handle_project_creation(self, project_id):
+        """Captures the project ID created by the details widget and stores it globally."""
+        print(f"Main Window received Project ID: {project_id}")
+        self.current_project_id = project_id
+
     # --- Refactored Navigation Logic (Fixes Recursion & Implements Locking) ---
     def show_project_detail_widgets(self, widget_name=None):
         """Handles widget switching and the 'Gatekeeper' logic for construction data."""
@@ -708,6 +715,11 @@ class UiMainWindow(object):
                 target_class = self.widget_map.get(widget_name)
                 if target_class:
                     self.current_right_widget = target_class(database=self.database_manager, parent=self)
+                    
+                    # JAWWAD : Pass the project ID if available
+                    if self.current_project_id and hasattr(self.current_right_widget, 'set_project_id'):
+                        self.current_right_widget.set_project_id(self.current_project_id)
+
                     # Connect signals safely
                     if hasattr(self.current_right_widget, 'next'):
                         self.current_right_widget.next.connect(self.next_widget)
@@ -722,6 +734,10 @@ class UiMainWindow(object):
             self.tabs_active = False
             self.active_tab_widgets = {}
             self.current_right_widget = ProjectDetailsWidget()
+            
+            # JAWWAD : CONNECT SIGNAL HERE - This fixes the "Project ID is None" error
+            self.current_right_widget.projectCreated.connect(self.handle_project_creation)
+            
             self.right_panel_placeholder.layout().addWidget(self.current_right_widget)
             self.current_right_widget.closed.connect(self.remove_right_widget)
 
@@ -759,6 +775,11 @@ class UiMainWindow(object):
             # 2. If not, create a new one and cache it
             print(f"[CACHE] Creating new widget for: {widget_name}")
             widget = self.widget_map[widget_name](database=self.database_manager, parent=self)
+            
+            # JAWWAD : Inject Project ID into new widget
+            if self.current_project_id and hasattr(widget, 'set_project_id'):
+                widget.set_project_id(self.current_project_id)
+                
             widget.next.connect(self.next_widget)
             widget.back.connect(self.prev_widget)
             self.cached_construction_widgets[widget_name] = widget
