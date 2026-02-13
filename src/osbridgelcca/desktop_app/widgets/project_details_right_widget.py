@@ -488,7 +488,7 @@ class ProjectDetailsWidget(QWidget):
     def expand_general_area(self):
         try:
             self.general_widget_animation.finished.disconnect()
-        except RuntimeError:
+        except Exception:
             pass
         if self.general_button_active:
             self.general_info_button.setIcon(self.unactive_arrow_icon)
